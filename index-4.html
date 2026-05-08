@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>أمازاد — المنظومة الكاملة</title>
+  <meta name="theme-color" content="#060810">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Amiri:wght@400;700&display=swap');
+
+    :root {
+      --bg:      #060810;
+      --bg2:     #0a0d18;
+      --bg3:     #0d1020;
+      --border:  #161b2e;
+      --border2: #1e2540;
+      --accent:  #7c3aed;
+      --accent2: #a855f7;
+      --gold:    #d4a947;
+      --gold2:   #f0c060;
+      --text:    #e8eaf0;
+      --muted:   #5a6280;
+      --muted2:  #2d3450;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      background: var(--bg);
+      font-family: 'Cairo', sans-serif;
+      direction: rtl;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 0%, #7c3aed0d 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 100%, #d4a9470a 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page-wrap {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 36px 16px 60px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+    .logo-wrap { text-align: center; margin-bottom: 32px; }
+    .logo-icon {
+      font-size: 52px; display: block; margin-bottom: 10px;
+      filter: drop-shadow(0 0 28px #7c3aed99);
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+    @keyframes pulse-glow {
+      0%,100% { filter: drop-shadow(0 0 28px #7c3aed99); }
+      50%      { filter: drop-shadow(0 0 44px #a855f7cc); }
+    }
+    .logo-title { font-size: 26px; font-weight: 900; color: var(--text); letter-spacing: .06em; font-family: 'Amiri', serif; }
+    .logo-sub   { font-size: 11px; color: var(--muted); margin-top: 4px; letter-spacing: .12em; }
+
+    /* SECTION LABEL */
+    .section-label {
+      font-size: 9px; color: var(--muted2); font-weight: 700;
+      letter-spacing: .18em; text-transform: uppercase;
+      width: 100%; margin-bottom: 8px; padding-right: 2px;
+    }
+
+    /* CARDS */
+    .cards { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-bottom: 20px; }
+
+    .card {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 18px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; cursor: pointer; text-decoration: none;
+      transition: border-color .2s, transform .15s, background .2s;
+      position: relative; overflow: hidden;
+    }
+    .card::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, #ffffff04 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .card:hover  { border-color: var(--accent); transform: translateY(-2px); background: #0e1224; }
+    .card:active { transform: translateY(0); }
+    .card.disabled { opacity: .4; cursor: not-allowed; }
+    .card.disabled:hover { transform: none; border-color: var(--border); background: var(--bg2); }
+
+    .card-icon  { font-size: 28px; flex-shrink: 0; }
+    .card-title { font-size: 15px; font-weight: 900; color: var(--text); margin-bottom: 2px; }
+    .card-desc  { font-size: 10px; color: var(--muted); line-height: 1.5; }
+    .card-badge {
+      margin-right: auto;
+      background: #7c3aed18; border: 1px solid #7c3aed33;
+      border-radius: 6px; padding: 2px 8px;
+      font-size: 9px; color: var(--accent2); font-weight: 700; flex-shrink: 0;
+    }
+    .card-badge.soon { background: #d4a94718; border-color: #d4a94733; color: var(--gold); }
+
+    .status-dot {
+      width: 5px; height: 5px; border-radius: 50%; display: inline-block; margin-left: 4px;
+      background: #22c55e; box-shadow: 0 0 5px #22c55e99;
+    }
+    .status-dot.warn { background: #f59e0b; box-shadow: 0 0 5px #f59e0b99; }
+    .status-dot.err  { background: #ef4444; box-shadow: 0 0 5px #ef444499; }
+    .bf-hint { font-size: 10px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 3px; }
+
+    /* LEADERBOARD */
+    .lb-card {
+      width: 100%;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden; margin-bottom: 20px;
+    }
+
+    .lb-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #0d1020 0%, #0a0d18 100%);
+      cursor: pointer; user-select: none;
+    }
+    .lb-header-left { display: flex; align-items: center; gap: 10px; }
+    .lb-crown  { font-size: 20px; }
+    .lb-title  { font-size: 14px; font-weight: 900; color: var(--gold2); letter-spacing: .04em; }
+    .lb-subtitle { font-size: 9px; color: var(--muted); margin-top: 1px; }
+    .lb-toggle {
+      font-size: 10px; color: var(--muted);
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 6px; padding: 3px 10px;
+      cursor: pointer; font-family: 'Cairo', sans-serif; transition: all .2s;
+    }
+    .lb-toggle:hover { border-color: var(--gold); color: var(--gold2); }
+
+    .lb-body { padding: 12px; display: none; }
+    .lb-body.open { display: block; }
+
+    .lb-loading { text-align: center; padding: 24px; font-size: 11px; color: var(--muted); }
+    .lb-spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border2); border-top-color: var(--gold);
+      border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .lb-empty { text-align: center; padding: 28px 16px; color: var(--muted2); font-size: 11px; }
+    .lb-empty-icon { font-size: 28px; margin-bottom: 8px; opacity: .4; }
+
+    /* entry */
+    .lb-entry {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px; border-radius: 10px; margin-bottom: 6px;
+      background: var(--bg3); border: 1px solid var(--border);
+      transition: border-color .2s, transform .15s;
+      position: relative; overflow: hidden;
+    }
+    .lb-entry:last-child { margin-bottom: 0; }
+    .lb-entry::before {
+      content: ''; position: absolute;
+      top: 0; right: 0; width: 3px; height: 100%;
+    }
+    .rank-1 .lb-entry-inner::before,
+    .lb-entry.top-1::before { background: linear-gradient(180deg, #ffd700, #f0c060); }
+    .lb-entry.top-2::before { background: linear-gradient(180deg, #c0c0c0, #a0a0b0); }
+    .lb-entry.top-3::before { background: linear-gradient(180deg, #cd7f32, #a06020); }
+
+    .lb-rank {
+      font-size: 12px; font-weight: 900; width: 24px;
+      text-align: center; flex-shrink: 0; color: var(--muted);
+    }
+    .lb-rank.gold   { color: #ffd700; text-shadow: 0 0 8px #ffd70066; font-size: 16px; }
+    .lb-rank.silver { color: #c0c0c0; font-size: 15px; }
+    .lb-rank.bronze { color: #cd7f32; font-size: 15px; }
+
+    .lb-avatar {
+      width: 46px; height: 46px; border-radius: 50%;
+      overflow: hidden; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700;
+    }
+    .lb-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .lb-info { flex: 1; min-width: 0; }
+    .lb-name {
+      font-size: 13px; font-weight: 900; margin-bottom: 1px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .lb-meta  { font-size: 9px; color: var(--muted); line-height: 1.4; }
+    .lb-desc  {
+      font-size: 10px; color: #5a6a8a; margin-top: 3px; line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+
+    .lb-power { text-align: left; flex-shrink: 0; }
+    .lb-power-val   { font-size: 14px; font-weight: 900; line-height: 1; font-family: 'Amiri', serif; }
+    .lb-power-label { font-size: 8px; color: var(--muted); margin-top: 1px; }
+
+    /* drag handle */
+    .lb-drag-handle {
+      cursor: grab; color: var(--muted2); font-size: 15px;
+      flex-shrink: 0; touch-action: none;
+      display: none; padding: 2px 4px; align-items: center;
+    }
+    .dev-active .lb-drag-handle { display: flex; }
+    .dev-active .lb-entry { border-color: var(--border2); }
+    .lb-entry.dragging { opacity: .45; border-color: var(--accent) !important; transform: scale(.97); }
+
+    /* remove btn */
+    .lb-remove-btn {
+      background: transparent; border: 1px solid #ef444433;
+      border-radius: 5px; color: #ef4444; font-size: 11px;
+      cursor: pointer; padding: 2px 8px; flex-shrink: 0; display: none;
+    }
+    .dev-active .lb-remove-btn { display: block; }
+
+    /* add row */
+    .lb-add-row {
+      display: none; gap: 6px; flex-wrap: wrap;
+      margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .dev-active + .lb-add-row,
+    .lb-add-row.visible { display: flex; }
+
+    .lb-add-select {
+      flex: 1; min-width: 0; background: var(--bg3);
+      border: 1px solid var(--accent2); border-radius: 7px;
+      color: var(--text); font-size: 11px; padding: 6px 10px;
+      font-family: 'Cairo', sans-serif; direction: rtl; cursor: pointer; outline: none;
+    }
+    .lb-add-btn {
+      padding: 6px 14px; background: var(--accent); border: none;
+      border-radius: 7px; color: #fff; font-size: 11px; font-weight: 700;
+      cursor: pointer; font-family: 'Cairo', sans-serif; white-space: nowrap;
+    }
+
+    /* dev btn */
+    .lb-dev-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px; background: transparent;
+      border: 1px dashed var(--border2); border-radius: 8px;
+      color: var(--muted); font-size: 10px; font-family: 'Cairo', sans-serif;
+      cursor: pointer; width: 100%; margin-top: 10px; transition: all .2s;
+    }
+    .lb-dev-btn:hover  { border-color: var(--accent); color: var(--accent2); }
+    .lb-dev-btn.active { border-color: #ef444455; color: #ef4444; background: #ef444408; }
+
+    /* DEV MODAL */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: #00000099; z-index: 3000;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--bg2); border: 1px solid #ef444433;
+      border-radius: 18px; padding: 28px 24px; width: min(320px, 90vw);
+      animation: modal-in .2s ease;
+    }
+    @keyframes modal-in {
+      from { opacity:0; transform: scale(.94) translateY(8px); }
+      to   { opacity:1; transform: scale(1)  translateY(0); }
+    }
+    .modal-title { font-size: 16px; font-weight: 900; color: #ef4444; text-align: center; margin-bottom: 6px; }
+    .modal-sub   { font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 18px; }
+    .modal-input {
+      width: 100%; background: var(--bg); border: 1px solid #ef444433;
+      border-radius: 9px; color: var(--text); font-size: 15px;
+      padding: 11px 14px; font-family: monospace; direction: ltr;
+      text-align: center; outline: none; box-sizing: border-box;
+      margin-bottom: 8px; transition: border-color .2s;
+    }
+    .modal-input:focus { border-color: #ef4444; }
+    .modal-msg  { font-size: 10px; text-align: center; margin-bottom: 10px; min-height: 14px; }
+    .modal-btns { display: flex; gap: 8px; }
+    .modal-confirm {
+      flex:1; padding: 10px; background: #3f1a1a; border: 1px solid #ef4444;
+      border-radius: 9px; color: #ef4444; font-size: 13px; font-weight: 700;
+      cursor: pointer; font-family: 'Cairo', sans-serif;
+    }
+    .modal-cancel {
+      padding: 10px 16px; background: transparent; border: 1px solid var(--border2);
+      border-radius: 9px; color: var(--muted); font-size: 13px;
+      cursor: pointer; font-family: 'Cairo', sans-serif;
+    }
+
+    /* TOAST */
+    #toast {
+      display: none; position: fixed; bottom: 32px; left: 50%;
+      transform: translateX(-50%);
+      background: #131825; border: 1px solid var(--border2);
+      border-radius: 10px; padding: 8px 18px;
+      font-size: 12px; color: var(--text); font-weight: 700;
+      z-index: 4000; white-space: nowrap;
+    }
+
+    .version { margin-top: 16px; font-size: 9px; color: #1a2030; text-align: center; }
+  </style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <!-- HEADER -->
+  <div class="logo-wrap">
+    <span class="logo-icon">⚔️</span>
+    <div class="logo-title">عالم أمازاد</div>
+    <div class="logo-sub">TTRPG — منظومة المرافق الكاملة</div>
+  </div>
+
+  <!-- MAIN TOOLS -->
+  <div class="section-label">الأدوات الرئيسية</div>
+  <div class="cards">
+
+    <a class="card" href="amazad.html">
+      <div class="card-icon">🎲</div>
+      <div class="card-info">
+        <div class="card-title">مولّد الشخصيات</div>
+        <div class="card-desc">إنشاء وحفظ وإدارة شخصيات NPC عشوائية
+          <div class="bf-hint"><span class="status-dot" id="npc-status"></span><span id="npc-status-text">يتحقق...</span></div>
+        </div>
+      </div>
+      <div class="card-badge">amazad.html</div>
+    </a>
+
+    <a class="card" href="amazad-battlefield.html">
+      <div class="card-icon">🗡️</div>
+      <div class="card-info">
+        <div class="card-title">أرض المعركة</div>
+        <div class="card-desc">خريطة قتالية بشبكة — ضع شخصياتك وحرّكها
+          <div class="bf-hint"><span class="status-dot warn" id="bf-status"></span><span id="bf-status-text">يتحقق...</span></div>
+        </div>
+      </div>
+      <div class="card-badge">جديد</div>
+    </a>
+
+    <!-- WORLD MAP stub -->
+    <div class="card disabled" onclick="showToast('🌍 خريطة العالم — قريباً!')">
+      <div class="card-icon">🌍</div>
+      <div class="card-info">
+        <div class="card-title">خريطة العالم</div>
+        <div class="card-desc">استكشف قارات أمازاد، المدن، والتاريخ</div>
+      </div>
+      <div class="card-badge soon">قريباً</div>
+    </div>
+
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="section-label">ترتيب القوى</div>
+  <div class="lb-card">
+
+    <div class="lb-header" onclick="toggleLeaderboard()">
+      <div class="lb-header-left">
+        <span class="lb-crown">👑</span>
+        <div>
+          <div class="lb-title">لوحة القوى</div>
+          <div class="lb-subtitle">أقوى شخصيات عالم أمازاد</div>
+        </div>
+      </div>
+      <button class="lb-toggle" id="lb-toggle-btn" onclick="event.stopPropagation(); toggleLeaderboard()">▼ عرض</button>
+    </div>
+
+    <div class="lb-body" id="lb-body">
+
+      <!-- loading -->
+      <div class="lb-loading" id="lb-loading" style="display:none">
+        <div class="lb-spinner"></div>
+        جاري التحميل من قاعدة البيانات...
+      </div>
+
+      <!-- list -->
+      <div id="lb-list"></div>
+
+      <!-- add row (dev only) -->
+      <div class="lb-add-row" id="lb-add-row">
+        <select class="lb-add-select" id="lb-add-select">
+          <option value="">اختر شخصية للإضافة للترتيب...</option>
+        </select>
+        <button class="lb-add-btn" onclick="addToLeaderboard()">+ إضافة</button>
+      </div>
+
+      <!-- dev toggle -->
+      <button class="lb-dev-btn" id="lb-dev-btn" onclick="toggleDevMode()">
+        🔒 <span id="lb-dev-label">وضع المطور — للتعديل والترتيب</span>
+      </button>
+
+    </div>
+  </div>
+
+  <div class="version">Amazad TTRPG — v2.1 | لوحة القوى + خريطة العالم قريباً</div>
+</div>
+
+<!-- DEV PASSWORD MODAL -->
+<div class="modal-overlay" id="dev-modal">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">🔐 وضع المطور</div>
+    <div class="modal-sub">أدخل كلمة السر للوصول لأدوات الترتيب</div>
+    <input type="password" class="modal-input" id="dev-pw-input"
+      placeholder="••••••••••••"
+      onkeydown="if(event.key==='Enter')confirmDevMode()">
+    <div class="modal-msg" id="dev-modal-msg"></div>
+    <div class="modal-btns">
+      <button class="modal-confirm" onclick="confirmDevMode()">تفعيل</button>
+      <button class="modal-cancel" onclick="closeDevModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   AMAZAD INDEX v2.1
+   Leaderboard with developer-controlled ordering
+═══════════════════════════════════════════════════════ */
+
+const SUPABASE_URL = "https://ewcsadahyyekvutgdnup.supabase.co";
+const SUPABASE_KEY = "sb_publishable_NHfl_osWeI-b_YKd1L_rpA_inHCksfO";
+const DEV_PASSWORD = "MaHerToon00toon";
+const LB_STORAGE   = "amazad_leaderboard_v1"; // [ {id, rank} ] — مخزنة محلياً
+const BF_KEY       = "amazad_bf_v2";
+
+let _sb, _sbOk = false;
+let _devMode   = false;
+let _allChars  = [];   // كل الشخصيات من Supabase
+let _lbOrder   = [];   // مصفوفة IDs مرتبة كما اختارها المطور
+let _lbOpen    = false;
+
+const RC = {
+  "إنسان":"#c8a96e","سكارد":"#a78bfa","آلزاداكايند":"#f97316","إتشيرما":"#38bdf8",
+  "سيلافين":"#e879f9","بهائم الظلام":"#dc2626","وحش الظلام":"#991b1b",
+  "ساروفيان":"#2dd4bf","ساروفيان خرافي":"#06b6d4","رؤوس الكلاب":"#a3a3a3","حيوان":"#84cc16",
+};
+
+/* ── init ── */
+async function init() {
+  try { _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); _sbOk = true; }
+  catch(e) { _sbOk = false; }
+  loadLbOrder();
+  await checkStatus();
+}
+
+/* ── status dots ── */
+async function checkStatus() {
+  try {
+    if (_sbOk) {
+      const { data } = await _sb.from('characters').select('id');
+      const n = data?.length || 0;
+      setDot('npc', n > 0, n > 0 ? `${n} شخصية محفوظة` : 'لا توجد شخصيات بعد', !n);
+    } else {
+      const raw = localStorage.getItem("amazad_profiles");
+      const arr = raw ? JSON.parse(raw) : [];
+      const n   = arr.length;
+      setDot('npc', n > 0, n > 0 ? `${n} شخصية (محلي)` : 'لا توجد شخصيات', !n);
+    }
+  } catch(e) { setDot('npc', false, 'خطأ في الاتصال', false); }
+
+  try {
+    const raw = localStorage.getItem(BF_KEY);
+    const d   = raw ? JSON.parse(raw) : null;
+    const has = !!d?.mapSrc;
+    setDot('bf', has, has ? `${d.tokens?.length||0} شخصية على الخريطة` : 'لا توجد خريطة', !has);
+  } catch(e) { setDot('bf', false, 'لم يُبدأ بعد', true); }
+}
+
+function setDot(id, ok, text, warn) {
+  const dot  = document.getElementById(id+'-status');
+  const span = document.getElementById(id+'-status-text');
+  if (dot)  dot.className  = 'status-dot' + (ok ? '' : warn ? ' warn' : ' err');
+  if (span) span.textContent = text;
+}
+
+/* ══════════════════════════════
+   LEADERBOARD CORE
+══════════════════════════════ */
+function loadLbOrder() {
+  try { _lbOrder = JSON.parse(localStorage.getItem(LB_STORAGE) || '[]'); }
+  catch(e) { _lbOrder = []; }
+}
+function saveLbOrder() {
+  try { localStorage.setItem(LB_STORAGE, JSON.stringify(_lbOrder)); } catch(e) {}
+}
+
+function toggleLeaderboard() {
+  _lbOpen = !_lbOpen;
+  document.getElementById('lb-body').classList.toggle('open', _lbOpen);
+  document.getElementById('lb-toggle-btn').textContent = _lbOpen ? '▲ إخفاء' : '▼ عرض';
+  if (_lbOpen && _allChars.length === 0) fetchCharsAndRender();
+  else if (_lbOpen) renderLeaderboard();
+}
+
+/* جلب كل الشخصيات */
+async function fetchCharsAndRender() {
+  document.getElementById('lb-loading').style.display = 'block';
+  document.getElementById('lb-list').innerHTML = '';
+  try {
+    if (_sbOk) {
+      const { data } = await _sb
+        .from('characters')
+        .select('id,name,race,level,hp_max,hala_max,defense,immunity,description,notes,image_url')
+        .order('created_at', { ascending: false });
+      _allChars = data || [];
+    } else {
+      const raw = localStorage.getItem("amazad_profiles");
+      _allChars = raw ? JSON.parse(raw) : [];
+    }
+  } catch(e) { _allChars = []; }
+  document.getElementById('lb-loading').style.display = 'none';
+  renderLeaderboard();
+  if (_devMode) populateAddSelect();
+}
+
+/* حساب درجة القوة */
+function calcPower(p) {
+  const hp   = +(p.hp_max   || p.hpMax   || 0);
+  const hala = +(p.hala_max || p.halaMax || 0);
+  const def  = +(p.defense  || p.dmgReduce || 0);
+  const imm  = +(p.immunity || 0);
+  const lv   = +(p.level    || 1);
+  return Math.round(hp * 0.4 + hala * 0.3 + def * 8 + imm * 6 + lv * 20);
+}
+
+/* رسم الليدربورد */
+function renderLeaderboard() {
+  const list = document.getElementById('lb-list');
+  list.innerHTML = '';
+  list.className = _devMode ? 'dev-active' : '';
+
+  // أظهر زر الإضافة وقائمة الاختيار إذا كان وضع المطور
+  document.getElementById('lb-add-row').classList.toggle('visible', _devMode);
+
+  const entries = _lbOrder
+    .map(id => _allChars.find(c => String(c.id || c.saveId) === String(id)))
+    .filter(Boolean);
+
+  if (entries.length === 0) {
+    list.innerHTML = `
+      <div class="lb-empty">
+        <div class="lb-empty-icon">👑</div>
+        لا توجد شخصيات في الترتيب بعد
+        <div style="font-size:9px;color:var(--muted2);margin-top:6px">
+          ${_devMode ? 'استخدم قائمة الإضافة أدناه' : 'يضيفها المطور من وضع المطور'}
+        </div>
+      </div>`;
+    return;
+  }
+
+  entries.forEach((p, idx) => {
+    const pid   = String(p.id || p.saveId || '');
+    const rc    = RC[p.race] || '#7c3aed';
+    const rank  = idx + 1;
+    const rIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+    const rCls  = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const power = calcPower(p);
+    const imgSrc = p.image_url || null;
+    const desc   = (p.description || p.notes || '').trim();
+
+    // local image fallback
+    let localImg = null;
+    try { localImg = localStorage.getItem(`amazad_img_${pid}`); } catch(e) {}
+    const finalImg = localImg || imgSrc;
+
+    const el = document.createElement('div');
+    el.className = `lb-entry top-${rank <= 3 ? rank : 'other'}`;
+    el.dataset.id = pid;
+    el.innerHTML = `
+      <div class="lb-drag-handle" title="اسحب لإعادة الترتيب">⠿</div>
+      <div class="lb-rank ${rCls}">${rIcon}</div>
+      <div class="lb-avatar" style="border:2px solid ${rc}80; background:${rc}18;">
+        ${finalImg
+          ? `<img src="${finalImg}" alt="${p.name || ''}" loading="lazy">`
+          : `<span style="color:${rc};font-weight:900">${(p.name||'?')[0]}</span>`
+        }
+      </div>
+      <div class="lb-info">
+        <div class="lb-name" style="color:${rc}">${p.name || 'بدون اسم'}</div>
+        <div class="lb-meta">${p.race || ''} • مستوى ${p.level || 1}</div>
+        ${desc ? `<div class="lb-desc">${desc}</div>` : ''}
+      </div>
+      <div class="lb-power">
+        <div class="lb-power-val" style="color:${rc}">${power.toLocaleString('ar-SA')}</div>
+        <div class="lb-power-label">قوة</div>
+      </div>
+      <button class="lb-remove-btn" onclick="removeFromLb('${pid}',event)">×</button>
+    `;
+    list.appendChild(el);
+  });
+
+  if (_devMode) initDragSort();
+}
+
+/* تعبئة قائمة الإضافة */
+function populateAddSelect() {
+  const sel = document.getElementById('lb-add-select');
+  sel.innerHTML = '<option value="">اختر شخصية للإضافة للترتيب...</option>';
+  _allChars
+    .filter(c => !_lbOrder.includes(String(c.id || c.saveId)))
+    .forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = String(c.id || c.saveId);
+      opt.textContent = `${c.name || 'بدون اسم'}  —  ${c.race || ''}  Lv.${c.level || 1}`;
+      sel.appendChild(opt);
+    });
+}
+
+function addToLeaderboard() {
+  const id = document.getElementById('lb-add-select').value;
+  if (!id) return showToast('اختر شخصية أولاً');
+  if (_lbOrder.includes(id)) return showToast('الشخصية موجودة بالفعل في الترتيب');
+  _lbOrder.push(id);
+  saveLbOrder();
+  renderLeaderboard();
+  populateAddSelect();
+  showToast('✓ تمت الإضافة للترتيب');
+}
+
+function removeFromLb(id, e) {
+  e.stopPropagation();
+  _lbOrder = _lbOrder.filter(x => x !== String(id));
+  saveLbOrder();
+  renderLeaderboard();
+  populateAddSelect();
+  showToast('تم الإزالة من الترتيب');
+}
+
+/* ══ DRAG & DROP للترتيب ══ */
+function initDragSort() {
+  const list  = document.getElementById('lb-list');
+  const items = [...list.querySelectorAll('.lb-entry')];
+  let dragging = null, startY = 0, origIdx = -1;
+
+  items.forEach(item => {
+    const handle = item.querySelector('.lb-drag-handle');
+    if (!handle) return;
+    handle.addEventListener('mousedown',  e => dragStart(e, item));
+    handle.addEventListener('touchstart', e => dragStart(e.touches[0], item), { passive: true });
+  });
+
+  function dragStart(e, item) {
+    dragging = item;
+    startY   = e.clientY;
+    origIdx  = [...list.children].indexOf(item);
+    item.classList.add('dragging');
+  }
+
+  function onMove(clientY) {
+    if (!dragging) return;
+    const siblings = [...list.querySelectorAll('.lb-entry:not(.dragging)')];
+    let before = null;
+    for (const s of siblings) {
+      const r = s.getBoundingClientRect();
+      if (clientY < r.top + r.height / 2) { before = s; break; }
+    }
+    list.insertBefore(dragging, before);
+  }
+
+  list.addEventListener('mousemove',  e => onMove(e.clientY));
+  list.addEventListener('touchmove',  e => onMove(e.touches[0].clientY), { passive: true });
+
+  function dragEnd() {
+    if (!dragging) return;
+    dragging.classList.remove('dragging');
+    dragging = null;
+    // حفظ الترتيب الجديد
+    _lbOrder = [...list.querySelectorAll('.lb-entry')].map(el => el.dataset.id);
+    saveLbOrder();
+    renderLeaderboard(); // إعادة رسم الأرقام/الميداليات
+  }
+
+  document.addEventListener('mouseup',  dragEnd);
+  document.addEventListener('touchend', dragEnd);
+}
+
+/* ══ DEV MODE ══ */
+function toggleDevMode() {
+  if (_devMode) {
+    _devMode = false;
+    applyDevUI();
+    showToast('🔒 وضع المطور أُغلق');
+  } else {
+    document.getElementById('dev-modal').classList.add('open');
+    setTimeout(() => document.getElementById('dev-pw-input').focus(), 80);
+  }
+}
+
+function confirmDevMode() {
+  const pw  = document.getElementById('dev-pw-input').value;
+  const msg = document.getElementById('dev-modal-msg');
+  if (pw === DEV_PASSWORD) {
+    _devMode = true;
+    closeDevModal();
+    applyDevUI();
+    if (_lbOpen && _allChars.length === 0) fetchCharsAndRender();
+    else renderLeaderboard(), populateAddSelect();
+    showToast('🔓 وضع المطور مفعّل');
+  } else {
+    msg.style.color = '#ef4444';
+    msg.textContent = '❌ كلمة السر خاطئة';
+    document.getElementById('dev-pw-input').value = '';
+    setTimeout(() => msg.textContent = '', 1800);
+  }
+}
+
+function closeDevModal() {
+  document.getElementById('dev-modal').classList.remove('open');
+  document.getElementById('dev-pw-input').value = '';
+  document.getElementById('dev-modal-msg').textContent = '';
+}
+
+function applyDevUI() {
+  const btn   = document.getElementById('lb-dev-btn');
+  const label = document.getElementById('lb-dev-label');
+  btn.classList.toggle('active', _devMode);
+  label.textContent = _devMode
+    ? '🔓 وضع المطور — اضغط للإغلاق'
+    : 'وضع المطور — للتعديل والترتيب';
+  document.getElementById('lb-add-row').classList.toggle('visible', _devMode);
+}
+
+/* ══ TOAST ══ */
+let _tt = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.style.display = 'block';
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.style.display = 'none', 2400);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDevModal(); });
+window.addEventListener('DOMContentLoaded', init);
+</script>
+
+</body>
+</html>
