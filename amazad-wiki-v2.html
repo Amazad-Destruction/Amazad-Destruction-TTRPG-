@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ويكي أمازاد</title>
+  <meta name="theme-color" content="#06080e">
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#06080e; font-family:'Segoe UI',Tahoma,Arial,sans-serif; direction:rtl; color:#e2e8f0; min-height:100vh; }
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#1e2535; border-radius:4px; }
+    select,input,textarea { font-family:inherit; }
+    input:focus,textarea:focus,select:focus { outline:none; }
+    @keyframes fi { from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);} }
+    @keyframes pulse { 0%,100%{opacity:.7}50%{opacity:1} }
+    textarea { resize:vertical; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+  <script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ══ Supabase ══ */
+const SUPABASE_URL = "https://ewcsadahyyekvutgdnup.supabase.co";
+const SUPABASE_KEY = "sb_publishable_NHfl_osWeI-b_YKd1L_rpA_inHCksfO";
+const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ══ ثوابت ══ */
+const CONTINENTS = ["دراثنار","آيراليس","جلارال","ساروفيا","إبريثس","يوكاري","نوران"];
+const CONTINENT_COLOR = {
+  "جلارال":"#f97316","نوران":"#eab308","آيراليس":"#22c55e",
+  "ساروفيا":"#3b82f6","دراثنار":"#ef4444","يوكاري":"#94a3b8","إبريثس":"#a855f7",
+};
+const CONTINENT_LABEL = { "إبريثس":"الهاوية (إبريثس)" };
+
+const RC = {
+  "إنسان":"#c8a96e","سكارد":"#a78bfa","آلزاداكايند":"#f97316","إتشيرما":"#38bdf8",
+  "سيلافين":"#e879f9","بهائم الظلام":"#dc2626","وحش الظلام":"#991b1b",
+  "ساروفيان":"#2dd4bf","ساروفيان خرافي":"#06b6d4","رؤوس الكلاب":"#a3a3a3","حيوان":"#84cc16",
+};
+
+const STAT_COLOR = {
+  "القوة":"#ef4444","البأس":"#ec4899","المعرفة":"#94a3b8","البراعة":"#eab308",
+  "الذكاء":"#3b82f6","الكاريزما":"#a855f7","الحظ":"#22c55e",
+};
+const STAT_NAMES = ["القوة","البأس","المعرفة","البراعة","الذكاء","الكاريزما","الحظ"];
+const SKILL_LEVEL_SYMBOL = {
+  "غير متعلم":"○","متعلم":"◌","خبير":"◎","متقدم":"◉","متقن":"✦","أستاذ":"★",
+  "قديس":"✸","نبوي":"❋","إلهي":"✾","بدائي":"⬟","أزلي":"◈",
+};
+const SKILL_LEVELS_ORDER = ["متعلم","خبير","متقدم","متقن","أستاذ","قديس","نبوي","إلهي","بدائي","أزلي"];
+const skillColor = n => ({"متعلم":"#60a5fa","خبير":"#34d399","متقدم":"#a3e635","متقن":"#fde047","أستاذ":"#fb923c","قديس":"#f87171","نبوي":"#e879f9","إلهي":"#c084fc","بدائي":"#fde68a","أزلي":"#ffffff"}[n]||"#9ca3af");
+
+const BG_TABLE = [
+  {min:1,max:10,name:"طفل"},{min:11,max:20,name:"عبد"},{min:21,max:30,name:"سجين"},
+  {min:31,max:40,name:"فلاح"},{min:41,max:50,name:"شخص عادي"},{min:51,max:60,name:"موظف"},
+  {min:61,max:70,name:"فارس / شرطي"},{min:71,max:80,name:"نبيل"},{min:81,max:90,name:"بارون"},
+  {min:91,max:95,name:"إيرل"},{min:96,max:100,name:"دوق / ملكي"},
+];
+
+/* ══ وضع المطور ══ */
+const DEV_PASSWORD = "MaHerToon00toon";
+const DEV_SESSION_KEY = "amazad_dev_session";
+const OWNER_TOKEN_KEY = "amazad_owner_token";
+function getOwnerToken(){
+  let t = localStorage.getItem(OWNER_TOKEN_KEY);
+  if(!t){ t="ot_"+Date.now().toString(36)+Math.random().toString(36).slice(2,8); localStorage.setItem(OWNER_TOKEN_KEY,t); }
+  return t;
+}
+
+/* ══ جلب الشخصية من Supabase ══ */
+const fetchChar = async (id) => {
+  const { data, error } = await _sb.from("characters").select("*").eq("id", String(id)).single();
+  if(error || !data) return null;
+  return data;
+};
+
+const fetchAllChars = async () => {
+  const { data, error } = await _sb.from("characters").select("id,name,race,level,image_url,continent,is_locked,owner_token,group_id").order("name",{ascending:true});
+  if(error) return [];
+  return data || [];
+};
+
+/* ══ جلب ملفات/مجموعات الشخصيات (لتنظيم شاشة التصفح) ══ */
+const fetchGroups = async () => {
+  try {
+    const { data, error } = await _sb.from("character_groups").select("*").order("name",{ascending:true});
+    if(error) return [];
+    return data || [];
+  } catch(e) { return []; }
+};
+
+/* ══ جلب ملخص ويكي كل الشخصيات: من يملك محتوى فعلي + خريطة الهاشتاقات (لشاشة التصفح) ══ */
+const fetchWikiSummaries = async () => {
+  try {
+    const { data, error } = await _sb.from("character_wiki").select("char_id,description,extra_sections,hashtags,images");
+    if(error) return { wikiCharIds:[], tagsMap:{} };
+    const wikiCharIds = [];
+    const tagsMap = {};
+    (data||[]).forEach(w=>{
+      const id = String(w.char_id);
+      const hasContent = (w.description&&w.description.trim()) || (w.extra_sections&&w.extra_sections.length>0) || (w.images&&w.images.length>0);
+      if(hasContent) wikiCharIds.push(id);
+      if(w.hashtags && w.hashtags.length) tagsMap[id] = w.hashtags;
+    });
+    return { wikiCharIds, tagsMap };
+  } catch(e) { return { wikiCharIds:[], tagsMap:{} }; }
+};
+
+/* ══ قاموس المصطلحات (مشترك عبر كل الويكي) ══ */
+const fetchTerms = async () => {
+  try {
+    const { data, error } = await _sb.from("wiki_terms").select("*").order("term",{ascending:true});
+    if(error) return [];
+    return data || [];
+  } catch(e) { return []; }
+};
+
+const upsertTerm = async (term) => {
+  try {
+    const row = {
+      id:          term.id || undefined,
+      term:        term.term || "",
+      aliases:     term.aliases || [],
+      definition:  term.definition || "",
+      category:    term.category || "",
+      updated_at:  new Date().toISOString(),
+    };
+    const { data, error } = await _sb.from("wiki_terms").upsert(row).select().single();
+    if(error) return null;
+    return data;
+  } catch(e) { return null; }
+};
+
+const deleteTerm = async (id) => {
+  try { await _sb.from("wiki_terms").delete().eq("id", id); return true; }
+  catch(e) { return false; }
+};
+
+/* ══ جلب ويكي الشخصية ══ */
+const fetchWiki = async (charId) => {
+  try {
+    const { data, error } = await _sb.from("character_wiki").select("*").eq("char_id", String(charId)).single();
+    if(error || !data) return null;
+    return data;
+  } catch(e) { return null; }
+};
+
+const upsertWiki = async (charId, wikiData) => {
+  try {
+    const row = {
+      char_id:      String(charId),
+      description:  wikiData.description || "",
+      city:         wikiData.city || "",
+      continent:    wikiData.continent || "دراثنار",
+      related_chars: wikiData.relatedChars || [],
+      extra_sections: wikiData.extraSections || [],
+      hashtags:     wikiData.hashtags || [],
+      images:       wikiData.images || [],
+      updated_at:   new Date().toISOString(),
+    };
+    const { error } = await _sb.from("character_wiki").upsert(row, { onConflict:"char_id" });
+    return !error;
+  } catch(e) { console.warn("upsertWiki:",e); return false; }
+};
+
+/* ══ مساعدات ══ */
+const getCharIdFromUrl = () => {
+  try { return new URLSearchParams(window.location.search).get("char") || null; } catch(e){ return null; }
+};
+
+const contColor = (cont) => CONTINENT_COLOR[cont] || "#ef4444";
+const raceColor = (race) => RC[race] || "#7c3aed";
+
+/* ══ محرك ربط المصطلحات تلقائياً داخل النصوص ══ */
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/* يبني تعبيراً نمطياً واحداً من كل المصطلحات وأسمائها البديلة، مرتبة من الأطول للأقصر
+   حتى يفوز التطابق الأطول دوماً عند التداخل (مثال: "سكارد خرافي" يُطابَق قبل "سكارد" وحدها) */
+const buildTermMatcher = (terms) => {
+  const entries = [];
+  for (const t of (terms||[])) {
+    if (t.term && t.term.trim()) entries.push({ text: t.term.trim(), term: t });
+    for (const a of (t.aliases||[])) {
+      if (a && a.trim()) entries.push({ text: a.trim(), term: t });
+    }
+  }
+  if (!entries.length) return null;
+  entries.sort((a,b) => b.text.length - a.text.length);
+  const textToTerm = {};
+  entries.forEach(e => { if(!textToTerm[e.text]) textToTerm[e.text] = e.term; });
+  const pattern = entries.map(e => escapeRegex(e.text)).join("|");
+  return { regex: new RegExp(pattern, "g"), textToTerm };
+};
+
+/* يقسّم نصاً إلى أجزاء عادية وأجزاء-مصطلحات قابلة للنقر */
+const splitTextByTerms = (text, matcher) => {
+  if (!text) return [];
+  if (!matcher) return [{ type:"text", value:text }];
+  const { regex, textToTerm } = matcher;
+  const parts = [];
+  let lastIndex = 0, m;
+  regex.lastIndex = 0;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > lastIndex) parts.push({ type:"text", value:text.slice(lastIndex, m.index) });
+    parts.push({ type:"term", value:m[0], term:textToTerm[m[0]] });
+    lastIndex = regex.lastIndex;
+    if (m[0].length === 0) regex.lastIndex++;
+  }
+  if (lastIndex < text.length) parts.push({ type:"text", value:text.slice(lastIndex) });
+  return parts;
+};
+
+/* ══ نص يربط المصطلحات المعروفة تلقائياً ويجعلها قابلة للنقر ══ */
+const TermLinkedText = ({ text, terms, onTermClick, style }) => {
+  const matcher = React.useMemo(()=>buildTermMatcher(terms), [terms]);
+  const parts = React.useMemo(()=>splitTextByTerms(text||"", matcher), [text, matcher]);
+  return (
+    <span style={style}>
+      {parts.map((p,i)=> p.type==="term" ? (
+        <span key={i} onClick={()=>onTermClick&&onTermClick(p.term)}
+          style={{color:"#fbbf24",fontWeight:"700",cursor:"pointer",borderBottom:"1px dotted #fbbf2488"}}>
+          {p.value}
+        </span>
+      ) : (
+        <React.Fragment key={i}>{p.value}</React.Fragment>
+      ))}
+    </span>
+  );
+};
+
+/* ══ نافذة تعريف مصطلح منبثقة ══ */
+const TermPopup = ({ term, terms, onTermClick, onClose, devMode, onEdit }) => {
+  if(!term) return null;
+  return (
+    <div style={{position:"fixed",inset:0,background:"#000000aa",zIndex:3000,display:"flex",
+      alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:"#0a0e1a",border:"1px solid #fbbf2444",borderRadius:"18px 18px 0 0",
+        width:"100%",maxWidth:"480px",padding:"18px 16px 28px",maxHeight:"70vh",overflowY:"auto",animation:"fi .2s ease"}}>
+        <div style={{width:"36px",height:"4px",background:"#232840",borderRadius:"2px",margin:"0 auto 14px"}}></div>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:"10px"}}>
+          <div>
+            <div style={{fontSize:"17px",fontWeight:"900",color:"#fbbf24"}}>📖 {term.term}</div>
+            {term.category && <div style={{fontSize:"10px",color:"#7a8599",marginTop:"3px"}}>{term.category}</div>}
+            {(term.aliases||[]).length>0 && (
+              <div style={{fontSize:"9px",color:"#4a5568",marginTop:"3px"}}>أسماء أخرى: {term.aliases.join("، ")}</div>
+            )}
+          </div>
+          <button onClick={onClose}
+            style={{background:"transparent",border:"1px solid #1a2035",borderRadius:"6px",
+              color:"#7a8599",fontSize:"11px",padding:"4px 10px",cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>✕</button>
+        </div>
+        <div style={{fontSize:"13px",color:"#cbd5e1",lineHeight:"2",whiteSpace:"pre-wrap"}}>
+          <TermLinkedText text={term.definition||"لا يوجد تعريف بعد."} terms={(terms||[]).filter(t=>t.id!==term.id)} onTermClick={onTermClick}/>
+        </div>
+        {devMode && (
+          <button onClick={()=>{onClose();onEdit&&onEdit(term);}}
+            style={{marginTop:"14px",padding:"6px 14px",background:"#0c1428",border:"1px solid #3b82f6",
+              borderRadius:"8px",color:"#60a5fa",fontSize:"11px",cursor:"pointer",fontFamily:"inherit"}}>
+            ✏ تعديل المصطلح
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ══ وسم هاشتاق قابل للنقر ══ */
+const HashtagPill = ({ tag, onClick, active=false }) => (
+  <span onClick={()=>onClick&&onClick(tag)}
+    style={{display:"inline-block",background:active?"#3b82f633":"#3b82f615",
+      border:`1px solid ${active?"#3b82f6":"#3b82f644"}`,color:active?"#93c5fd":"#60a5fa",
+      fontSize:"10px",fontWeight:"700",borderRadius:"6px",padding:"3px 9px",
+      cursor:onClick?"pointer":"default",fontFamily:"inherit"}}>
+    #{tag}
+  </span>
+);
+
+/* يضغط صورة مرفوعة إلى حد أقصى 800px على الضلع الأطول، ويحولها إلى JPEG — لتقليل حجمها كنص base64 */
+const resizeImageFile = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error("فشلت قراءة الملف"));
+  reader.onload = () => {
+    const img = new Image();
+    img.onerror = () => reject(new Error("فشل تحميل الصورة"));
+    img.onload = () => {
+      const maxSide = 800;
+      let { width, height } = img;
+      if (width > maxSide || height > maxSide) {
+        if (width >= height) { height = Math.round(height * (maxSide/width)); width = maxSide; }
+        else { width = Math.round(width * (maxSide/height)); height = maxSide; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.8));
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+/* ══ معرض صور متعدد للشخصية — يدعم الرفع المباشر (base64) أو لصق رابط خارجي ══ */
+const ImageGallery = ({ images, editing, onChange }) => {
+  const [lightbox, setLightbox] = React.useState(null); // index أو null
+  const [urlInput, setUrlInput] = React.useState("");
+  const [uploading, setUploading] = React.useState(false);
+  const fileInputRef = React.useRef(null);
+  const list = images || [];
+
+  const addImage = (url) => {
+    if(!url) return;
+    onChange([...list, { url, caption:"" }]);
+  };
+  const handleFiles = async (files) => {
+    if(!files || !files.length) return;
+    setUploading(true);
+    try{
+      for(const file of Array.from(files)){
+        if(!file.type.startsWith("image/")) continue;
+        const dataUrl = await resizeImageFile(file);
+        addImage(dataUrl);
+      }
+    }catch(e){ alert("تعذّر معالجة إحدى الصور"); }
+    setUploading(false);
+  };
+  const updateCaption = (i, caption) => onChange(list.map((im,j)=>j===i?{...im,caption}:im));
+  const removeImage = (i) => onChange(list.filter((_,j)=>j!==i));
+  const moveImage = (i, dir) => {
+    const j = i+dir;
+    if(j<0||j>=list.length) return;
+    const next=[...list]; [next[i],next[j]]=[next[j],next[i]];
+    onChange(next);
+  };
+
+  if(!editing && list.length===0) return null;
+
+  return (
+    <div style={{marginBottom:"12px"}}>
+      {list.length>0 && (
+        <div style={{display:"flex",gap:"8px",overflowX:"auto",paddingBottom:"4px"}}>
+          {list.map((im,i)=>(
+            <div key={i} style={{position:"relative",flexShrink:0,width:editing?"110px":"96px"}}>
+              <div onClick={()=>!editing&&setLightbox(i)}
+                style={{width:editing?"110px":"96px",height:editing?"110px":"96px",borderRadius:"10px",
+                  overflow:"hidden",border:"1px solid #1e2740",cursor:editing?"default":"pointer",background:"#0c0f1a"}}>
+                <img src={im.url} style={{width:"100%",height:"100%",objectFit:"cover"}} draggable={false}/>
+              </div>
+              {editing && (
+                <>
+                  <input value={im.caption||""} onChange={e=>updateCaption(i,e.target.value)}
+                    placeholder="وصف الصورة..."
+                    style={{width:"110px",marginTop:"4px",background:"#080b14",border:"1px solid #1e2740",
+                      borderRadius:"5px",color:"#94a3b8",fontSize:"9px",padding:"3px 6px",
+                      fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+                  <div style={{display:"flex",gap:"3px",marginTop:"3px",justifyContent:"center"}}>
+                    <button onClick={()=>moveImage(i,-1)} disabled={i===0}
+                      style={{background:"transparent",border:"1px solid #ffffff14",borderRadius:"4px",
+                        color:i===0?"#2a3242":"#7a8599",fontSize:"9px",padding:"1px 5px",cursor:i===0?"default":"pointer"}}>◀</button>
+                    <button onClick={()=>removeImage(i)}
+                      style={{background:"#ef444422",border:"1px solid #ef444433",borderRadius:"4px",
+                        color:"#ef4444",fontSize:"9px",padding:"1px 5px",cursor:"pointer"}}>🗑</button>
+                    <button onClick={()=>moveImage(i,1)} disabled={i===list.length-1}
+                      style={{background:"transparent",border:"1px solid #ffffff14",borderRadius:"4px",
+                        color:i===list.length-1?"#2a3242":"#7a8599",fontSize:"9px",padding:"1px 5px",cursor:i===list.length-1?"default":"pointer"}}>▶</button>
+                  </div>
+                </>
+              )}
+              {!editing && im.caption && (
+                <div style={{fontSize:"9px",color:"#7a8599",marginTop:"3px",textAlign:"center",
+                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{im.caption}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <div style={{display:"flex",gap:"6px",marginTop:"8px",flexWrap:"wrap"}}>
+          <input ref={fileInputRef} type="file" accept="image/*" multiple style={{display:"none"}}
+            onChange={e=>{handleFiles(e.target.files); e.target.value="";}}/>
+          <button onClick={()=>fileInputRef.current&&fileInputRef.current.click()} disabled={uploading}
+            style={{padding:"6px 12px",background:"#0c1428",border:"1px solid #3b82f6",borderRadius:"7px",
+              color:"#60a5fa",fontSize:"10px",fontWeight:"700",cursor:uploading?"default":"pointer",fontFamily:"inherit"}}>
+            {uploading?"⏳ جاري الرفع...":"📤 رفع صورة"}
+          </button>
+          <input value={urlInput} onChange={e=>setUrlInput(e.target.value)}
+            placeholder="أو الصق رابط صورة..."
+            style={{flex:1,minWidth:"140px",background:"#080b14",border:"1px solid #1e2740",borderRadius:"7px",
+              color:"#e2e8f0",fontSize:"11px",padding:"6px 9px",fontFamily:"inherit",direction:"ltr",boxSizing:"border-box"}}/>
+          <button onClick={()=>{ if(urlInput.trim()){ addImage(urlInput.trim()); setUrlInput(""); } }}
+            style={{padding:"6px 12px",background:"#052e16",border:"1px solid #16a34a",borderRadius:"7px",
+              color:"#4ade80",fontSize:"10px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>
+            + إضافة
+          </button>
+        </div>
+      )}
+
+      {lightbox!==null && list[lightbox] && (
+        <div style={{position:"fixed",inset:0,background:"#000000ee",zIndex:3500,display:"flex",
+          flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px"}}
+          onClick={()=>setLightbox(null)}>
+          <img src={list[lightbox].url} style={{maxWidth:"100%",maxHeight:"80vh",borderRadius:"8px",objectFit:"contain"}}/>
+          {list[lightbox].caption && (
+            <div style={{color:"#cbd5e1",fontSize:"12px",marginTop:"12px",textAlign:"center"}}>{list[lightbox].caption}</div>
+          )}
+          <div style={{display:"flex",gap:"16px",marginTop:"16px"}}>
+            {list.length>1 && (
+              <button onClick={e=>{e.stopPropagation();setLightbox((lightbox-1+list.length)%list.length);}}
+                style={{background:"#ffffff11",border:"1px solid #ffffff22",borderRadius:"8px",
+                  color:"#e2e8f0",fontSize:"16px",padding:"6px 14px",cursor:"pointer"}}>◀</button>
+            )}
+            <button onClick={()=>setLightbox(null)}
+              style={{background:"#ffffff11",border:"1px solid #ffffff22",borderRadius:"8px",
+                color:"#e2e8f0",fontSize:"12px",padding:"6px 16px",cursor:"pointer",fontFamily:"inherit"}}>إغلاق</button>
+            {list.length>1 && (
+              <button onClick={e=>{e.stopPropagation();setLightbox((lightbox+1)%list.length);}}
+                style={{background:"#ffffff11",border:"1px solid #ffffff22",borderRadius:"8px",
+                  color:"#e2e8f0",fontSize:"16px",padding:"6px 14px",cursor:"pointer"}}>▶</button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ══ مكوّن الإحصاء ══ */
+const StatBadge = ({ name, value, max }) => {
+  const col = STAT_COLOR[name] || "#9ca3af";
+  const pct = Math.min(100, Math.round((value / (max||30)) * 100));
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}}>
+      <div style={{width:"60px",fontSize:"10px",color:col,fontWeight:"700",textAlign:"right",flexShrink:0}}>{name}</div>
+      <div style={{flex:1,height:"4px",background:"#1e2535",borderRadius:"2px",overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${col}88,${col})`,borderRadius:"2px",transition:"width .5s ease"}}/>
+      </div>
+      <div style={{width:"28px",fontSize:"12px",fontWeight:"800",color:col,textAlign:"left",flexShrink:0,direction:"ltr"}}>{value}</div>
+    </div>
+  );
+};
+
+/* ══ مكوّن الشخصية المرتبطة ══ */
+const RelatedCharCard = ({ rc, allChars, onClick }) => {
+  const linked = allChars.find(c => c.id === rc.charId);
+  const col = linked ? raceColor(linked.race) : "#7c3aed";
+  return (
+    <div onClick={()=>linked&&onClick&&onClick(linked.id)}
+      style={{background:"#0a0d18",border:`1px solid ${col}44`,borderRadius:"10px",
+        padding:"10px 12px",cursor:linked?"pointer":"default",
+        transition:"border-color .2s",display:"flex",gap:"10px",alignItems:"center"}}>
+      <div style={{width:"36px",height:"36px",borderRadius:"50%",border:`2px solid ${col}`,
+        overflow:"hidden",background:`${col}18`,flexShrink:0,
+        display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {linked?.image_url
+          ? <img src={linked.image_url} style={{width:"100%",height:"100%",objectFit:"cover"}} draggable={false}/>
+          : <span style={{fontSize:"14px",color:col,fontWeight:"700"}}>{(rc.name||"؟")[0]}</span>
+        }
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:"12px",fontWeight:"700",color:"#e2e8f0"}}>{rc.name}</div>
+        {rc.relLabel && <div style={{fontSize:"10px",color:col,marginTop:"1px",fontWeight:"600"}}>{rc.relLabel}</div>}
+        {rc.relDesc  && <div style={{fontSize:"10px",color:"#7a8599",marginTop:"2px",lineHeight:"1.5"}}>{rc.relDesc}</div>}
+      </div>
+      {linked && <span style={{fontSize:"9px",color:col,opacity:.6}}>◀</span>}
+    </div>
+  );
+};
+
+/* ══ سكشن قابل للطي ══ */
+const WikiSection = ({ title, accent="#7c3aed", icon, children, defaultOpen=true }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{marginBottom:"16px"}}>
+      <button onClick={()=>setOpen(p=>!p)}
+        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+          background:"transparent",border:"none",borderBottom:`1px solid ${accent}33`,
+          padding:"6px 0 8px",cursor:"pointer",fontFamily:"inherit"}}>
+        <span style={{fontSize:"12px",fontWeight:"800",color:accent,letterSpacing:"0.05em"}}>
+          {icon && <span style={{marginLeft:"6px"}}>{icon}</span>}{title}
+        </span>
+        <span style={{fontSize:"10px",color:accent,opacity:.6,transition:"transform .2s",
+          transform:open?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+      </button>
+      {open && <div style={{paddingTop:"12px",animation:"fi .15s ease"}}>{children}</div>}
+    </div>
+  );
+};
+
+/* ══ حقل تحرير الويكي ══ */
+const WikiTextArea = ({ label, value, onChange, placeholder, rows=4 }) => (
+  <div style={{marginBottom:"12px"}}>
+    {label && <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"5px",fontWeight:"700",letterSpacing:".06em"}}>{label}</div>}
+    <textarea value={value||""} onChange={e=>onChange(e.target.value)} rows={rows}
+      placeholder={placeholder}
+      style={{width:"100%",background:"#080b14",border:"1px solid #1e2740",borderRadius:"8px",
+        color:"#cbd5e1",fontSize:"12px",padding:"9px 11px",lineHeight:"1.8",
+        fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+  </div>
+);
+
+/* ══ مكوّن تحرير الشخصية المرتبطة ══ */
+const RelEditor = ({ rel, allChars, onChange, onRemove }) => {
+  const linked = allChars.find(c=>c.id===rel.charId);
+  const col = linked ? raceColor(linked.race) : "#7c3aed";
+  return (
+    <div style={{background:"#09101e",border:`1px solid ${col}33`,borderRadius:"10px",padding:"10px 12px",marginBottom:"8px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"}}>
+        <div style={{width:"30px",height:"30px",borderRadius:"50%",border:`2px solid ${col}55`,
+          overflow:"hidden",background:`${col}18`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {linked?.image_url
+            ? <img src={linked.image_url} style={{width:"100%",height:"100%",objectFit:"cover"}} draggable={false}/>
+            : <span style={{fontSize:"12px",color:col,fontWeight:"700"}}>{(rel.name||"؟")[0]}</span>}
+        </div>
+        <div style={{flex:1,fontSize:"11px",fontWeight:"700",color:"#c4cce0"}}>{rel.name}</div>
+        <button onClick={onRemove}
+          style={{background:"#ef444422",border:"1px solid #ef444433",borderRadius:"5px",
+            color:"#ef4444",fontSize:"11px",padding:"1px 7px",cursor:"pointer",fontFamily:"inherit"}}>×</button>
+      </div>
+      <input value={rel.relLabel||""} onChange={e=>onChange({...rel,relLabel:e.target.value})}
+        placeholder="نوع العلاقة (مثال: صديق، عدو، أخ...)"
+        style={{width:"100%",background:"#080b14",border:"1px solid #1e2740",borderRadius:"6px",
+          color:`${col}`,fontSize:"11px",padding:"5px 9px",marginBottom:"6px",
+          fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+      <textarea value={rel.relDesc||""} onChange={e=>onChange({...rel,relDesc:e.target.value})} rows={2}
+        placeholder="وصف العلاقة..."
+        style={{width:"100%",background:"#080b14",border:"1px solid #1e2740",borderRadius:"6px",
+          color:"#94a3b8",fontSize:"10px",padding:"5px 9px",lineHeight:"1.6",resize:"none",
+          fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+    </div>
+  );
+};
+
+/* ══ المكوّن الرئيسي ══ */
+function WikiApp() {
+  const [charId,     setCharId]     = useState(getCharIdFromUrl());
+  const [char,       setChar]       = useState(null);
+  const [wiki,       setWiki]       = useState(null);
+  const [allChars,   setAllChars]   = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [notFound,   setNotFound]   = useState(false);
+  const [devMode,    setDevMode]    = useState(false);
+  const [devOpen,    setDevOpen]    = useState(false);
+  const [devPw,      setDevPw]      = useState("");
+  const [devErr,     setDevErr]     = useState(false);
+  const [editing,    setEditing]    = useState(false);
+  const [draft,      setDraft]      = useState(null);
+  const [saving,     setSaving]     = useState(false);
+  const [saveOk,     setSaveOk]     = useState(false);
+  const [charSearch, setCharSearch] = useState("");
+  const [relPickOpen,setRelPickOpen]= useState(false);
+  const [secTitle,   setSecTitle]   = useState("");
+  const [imgErr,     setImgErr]     = useState(false);
+  const [browsing,   setBrowsing]   = useState(!charId);
+  const [allPublic,  setAllPublic]  = useState([]);
+
+  /* ══ ملفات/مجلدات الشخصيات ══ */
+  const [groups,      setGroups]      = useState([]);
+  const [wikiCharIds, setWikiCharIds] = useState([]); // الشخصيات التي تملك محتوى ويكي فعلي
+  const [wikiTagsMap, setWikiTagsMap] = useState({}); // char_id -> hashtags[]
+
+  /* ══ قاموس المصطلحات ══ */
+  const [terms,         setTerms]         = useState([]);
+  const [termPopup,     setTermPopup]     = useState(null); // المصطلح المعروض حالياً
+  const [termsManagerOpen, setTermsManagerOpen] = useState(false);
+  const [tagInput,      setTagInput]      = useState("");
+  const [tagFilter,     setTagFilter]     = useState(null); // للفلترة في شاشة التصفح
+
+  /* ── تحميل كل الشخصيات للاختيار ── */
+  useEffect(()=>{
+    fetchAllChars().then(list=>{
+      setAllChars(list);
+      setAllPublic(list.filter(c=>!c.is_locked));
+    });
+    fetchGroups().then(setGroups);
+    fetchWikiSummaries().then(({wikiCharIds, tagsMap})=>{ setWikiCharIds(wikiCharIds); setWikiTagsMap(tagsMap); });
+    fetchTerms().then(setTerms);
+  },[]);
+
+  /* ── وضع المطور من الجلسة ── */
+  useEffect(()=>{
+    try{ if(localStorage.getItem(DEV_SESSION_KEY)===DEV_PASSWORD) setDevMode(true); }catch(e){}
+  },[]);
+
+  /* ── تحميل الشخصية والويكي ── */
+  useEffect(()=>{
+    if(!charId){ setLoading(false); setBrowsing(true); return; }
+    setLoading(true); setNotFound(false); setImgErr(false);
+    Promise.all([fetchChar(charId), fetchWiki(charId)]).then(([c,w])=>{
+      if(!c){ setNotFound(true); setLoading(false); return; }
+      setChar(c);
+      const wikiData = w || { description:"",city:c.city||"",continent:c.continent||"دراثنار",relatedChars:[],extraSections:[] };
+      setWiki(wikiData);
+      setLoading(false);
+    });
+  },[charId]);
+
+  /* ── بدء التحرير ── */
+  const startEdit = () => {
+    if(!devMode){ setDevOpen(true); return; }
+    setDraft({
+      description:   wiki?.description  || "",
+      city:          wiki?.city         || char?.city || "",
+      continent:     wiki?.continent    || char?.continent || "دراثنار",
+      relatedChars:  wiki?.relatedChars || [],
+      extraSections: wiki?.extraSections|| [],
+      hashtags:      wiki?.hashtags     || [],
+      images:        wiki?.images       || [],
+    });
+    setEditing(true);
+  };
+
+  /* ── حفظ الويكي ── */
+  const saveWiki = async () => {
+    if(!draft||!charId) return;
+    setSaving(true);
+    const ok = await upsertWiki(charId, draft);
+    if(ok){
+      setWiki({...draft});
+      setSaveOk(true);
+      setTimeout(()=>setSaveOk(false),2000);
+      // تحديث قائمة "الشخصيات التي تملك ويكي" فوراً — لتنعكس في شاشة التصفح دون إعادة تحميل الصفحة
+      const hasContent = (draft.description&&draft.description.trim()) || (draft.extraSections&&draft.extraSections.length>0) || (draft.images&&draft.images.length>0);
+      setWikiCharIds(prev=>{
+        const has = prev.includes(String(charId));
+        if(hasContent && !has) return [...prev, String(charId)];
+        if(!hasContent && has) return prev.filter(id=>id!==String(charId));
+        return prev;
+      });
+    }
+    setSaving(false);
+    setEditing(false);
+  };
+
+  /* ── تسجيل الدخول كمطور ── */
+  const loginDev = () => {
+    if(devPw===DEV_PASSWORD){
+      setDevMode(true); setDevOpen(false); setDevPw(""); setDevErr(false);
+      try{ localStorage.setItem(DEV_SESSION_KEY,DEV_PASSWORD); }catch(e){}
+      if(char) startEdit();
+    } else {
+      setDevErr(true);
+      setTimeout(()=>setDevErr(false),1500);
+    }
+  };
+
+  /* ── إضافة شخصية مرتبطة ── */
+  const addRelated = (c) => {
+    if(!draft) return;
+    if(draft.relatedChars.find(r=>r.charId===c.id)) return;
+    setDraft(p=>({...p,relatedChars:[...p.relatedChars,{charId:c.id,name:c.name,relLabel:"",relDesc:""}]}));
+    setRelPickOpen(false);
+  };
+
+  /* ── إضافة/حذف هاشتاق ── */
+  const addHashtag = () => {
+    const t = tagInput.trim().replace(/^#+/,""); // إزالة أي # مكتوب يدوياً في البداية
+    if(!t || !draft) return;
+    if((draft.hashtags||[]).includes(t)){ setTagInput(""); return; }
+    setDraft(p=>({...p,hashtags:[...(p.hashtags||[]),t]}));
+    setTagInput("");
+  };
+  const removeHashtag = (t) => setDraft(p=>({...p,hashtags:(p.hashtags||[]).filter(x=>x!==t)}));
+
+  /* ── فتح نافذة تعريف مصطلح عند النقر عليه داخل أي نص ── */
+  const openTermPopup = (term) => setTermPopup(term);
+
+  /* ── فتح شخصية أخرى من الويكي ── */
+  const openChar = (id) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("char",id);
+    window.location.href = url.toString();
+  };
+
+  /* ═══════════════════════════════
+     شاشة التصفح / اختيار الشخصية
+  ═══════════════════════════════ */
+  if(browsing){
+    const q = charSearch.trim().toLowerCase();
+    // كل الهاشتاقات المستخدمة فعلياً، مرتبة حسب الأكثر استخداماً
+    const tagCounts = {};
+    Object.values(wikiTagsMap).forEach(tags=>{
+      (tags||[]).forEach(t=>{ tagCounts[t] = (tagCounts[t]||0)+1; });
+    });
+    const allTagsList = Object.keys(tagCounts).sort((a,b)=>tagCounts[b]-tagCounts[a]);
+    const matchesSearchAndTag = (c) => {
+      const sOk = !q || (c.name||"").toLowerCase().includes(q) || (c.race||"").toLowerCase().includes(q);
+      if(!sOk) return false;
+      if(tagFilter){
+        // نحتاج وسوم الشخصية، لكن allPublic لا يحمل hashtags — نتحقق عبر wikiTagsMap أدناه
+        return (wikiTagsMap[String(c.id)]||[]).includes(tagFilter);
+      }
+      return true;
+    };
+
+    const hasWiki = (c) => wikiCharIds.includes(String(c.id));
+    const wikiChars = allPublic.filter(c=>hasWiki(c) && matchesSearchAndTag(c));
+    const noWikiChars = allPublic.filter(c=>!hasWiki(c) && matchesSearchAndTag(c));
+
+    // تجميع شخصيات الويكي حسب الملف
+    const byGroup = {};
+    const ungrouped = [];
+    wikiChars.forEach(c=>{
+      if(c.group_id && groups.find(g=>g.id===c.group_id)){
+        (byGroup[c.group_id] = byGroup[c.group_id] || []).push(c);
+      } else {
+        ungrouped.push(c);
+      }
+    });
+    const orderedGroups = groups.filter(g=>byGroup[g.id]?.length);
+
+    const totalShown = wikiChars.length + noWikiChars.length;
+
+    const CharCard = ({ c }) => {
+      const cc = contColor(c.continent);
+      const rc = raceColor(c.race);
+      return(
+        <div onClick={()=>openChar(c.id)}
+          style={{background:`linear-gradient(160deg,#0b0e1a,${cc}10)`,
+            border:`1px solid ${cc}33`,borderRadius:"12px",padding:"12px 10px",
+            cursor:"pointer",textAlign:"center",transition:"border-color .2s",
+            animation:"fi .2s ease"}}>
+          <div style={{width:"52px",height:"52px",borderRadius:"50%",
+            border:`2px solid ${rc}`,margin:"0 auto 8px",overflow:"hidden",
+            background:`${rc}18`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {c.image_url
+              ?<img src={c.image_url} style={{width:"100%",height:"100%",objectFit:"cover"}} draggable={false}/>
+              :<span style={{fontSize:"20px",color:rc,fontWeight:"700"}}>{(c.name||"؟")[0]}</span>}
+          </div>
+          <div style={{fontSize:"11px",fontWeight:"700",color:"#e2e8f0",marginBottom:"2px",
+            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
+          <div style={{fontSize:"9px",color:rc}}>{c.race}</div>
+          <div style={{fontSize:"8px",color:"#4a5568",marginTop:"1px"}}>Lv.{c.level}</div>
+        </div>
+      );
+    };
+
+    return (
+      <div style={{minHeight:"100vh",background:"#06080e",padding:"20px 16px",maxWidth:"640px",margin:"0 auto"}}>
+        {/* هيدر */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"24px"}}>
+          <div>
+            <div style={{fontSize:"22px",fontWeight:"900",color:"#e2e8f0",letterSpacing:"-.02em"}}>
+              ⚔ ويكي أمازاد
+            </div>
+            <div style={{fontSize:"10px",color:"#4a5568",marginTop:"2px"}}>موسوعة شخصيات عالم أمازاد TTRPG</div>
+          </div>
+          <div style={{display:"flex",gap:"6px"}}>
+            {devMode && (
+              <button onClick={()=>setTermsManagerOpen(true)}
+                style={{padding:"5px 10px",background:"#fbbf2422",border:"1px solid #fbbf2455",borderRadius:"6px",
+                  color:"#fbbf24",fontSize:"9px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>
+                📖 المصطلحات
+              </button>
+            )}
+            <button onClick={()=>devMode?(() => {setDevMode(false);try{localStorage.removeItem(DEV_SESSION_KEY);}catch(e){}})():setDevOpen(true)}
+              style={{padding:"5px 12px",background:devMode?"#7c3aed22":"#0c1428",
+                border:`1px solid ${devMode?"#7c3aed":"#374151"}`,borderRadius:"6px",
+                color:devMode?"#a78bfa":"#4b5563",fontSize:"9px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>
+              {devMode?"🔓 مطور":"🔒 مطور"}
+            </button>
+          </div>
+        </div>
+
+        {/* بحث */}
+        <input value={charSearch} onChange={e=>setCharSearch(e.target.value)}
+          placeholder="🔍 ابحث بالاسم أو العرق..."
+          style={{width:"100%",background:"#0b0e1a",border:"1px solid #1e2740",borderRadius:"10px",
+            color:"#c4cce0",fontSize:"13px",padding:"10px 14px",marginBottom:"12px",
+            fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+
+        {/* فلتر الهاشتاق النشط */}
+        {tagFilter && (
+          <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"16px"}}>
+            <span style={{fontSize:"10px",color:"#7a8599"}}>تصفية حسب:</span>
+            <HashtagPill tag={tagFilter} active onClick={()=>setTagFilter(null)}/>
+            <span style={{fontSize:"9px",color:"#4a5568"}}>(اضغط للإزالة)</span>
+          </div>
+        )}
+        {!tagFilter && allTagsList.length>0 && (
+          <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"16px"}}>
+            {allTagsList.slice(0,12).map(t=>(
+              <HashtagPill key={t} tag={t} onClick={()=>setTagFilter(t)}/>
+            ))}
+          </div>
+        )}
+
+        {totalShown===0 ? (
+          <div style={{textAlign:"center",color:"#2d3748",padding:"40px",fontSize:"14px"}}>لا توجد شخصيات</div>
+        ) : (
+          <>
+            {/* ── شخصيات بلا ملف لكن تملك ويكي ── */}
+            {ungrouped.length>0 && (
+              <div style={{marginBottom:"22px"}}>
+                <div style={{fontSize:"11px",fontWeight:"800",color:"#94a3b8",marginBottom:"10px",
+                  display:"flex",alignItems:"center",gap:"6px"}}>
+                  <span>📄 بلا ملف</span><span style={{fontSize:"9px",color:"#4a5568"}}>({ungrouped.length})</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:"10px"}}>
+                  {ungrouped.map(c=><CharCard key={c.id} c={c}/>)}
+                </div>
+              </div>
+            )}
+
+            {/* ── شخصيات مجمّعة حسب الملف ── */}
+            {orderedGroups.map(g=>(
+              <div key={g.id} style={{marginBottom:"22px"}}>
+                <div style={{fontSize:"11px",fontWeight:"800",color:g.color||"#a78bfa",marginBottom:"10px",
+                  display:"flex",alignItems:"center",gap:"6px",borderBottom:`1px solid ${g.color||"#a78bfa"}33`,paddingBottom:"6px"}}>
+                  <span>{g.icon||"📁"} {g.name}</span>
+                  <span style={{fontSize:"9px",color:"#4a5568"}}>({byGroup[g.id].length})</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:"10px"}}>
+                  {byGroup[g.id].map(c=><CharCard key={c.id} c={c}/>)}
+                </div>
+              </div>
+            ))}
+
+            {/* ── شخصيات بلا محتوى ويكي بعد ── */}
+            {noWikiChars.length>0 && (
+              <div style={{marginTop:"28px",paddingTop:"18px",borderTop:"1px solid #1e2535"}}>
+                <div style={{fontSize:"11px",fontWeight:"800",color:"#4a5568",marginBottom:"10px",
+                  display:"flex",alignItems:"center",gap:"6px"}}>
+                  <span>📭 بلا ويكي بعد</span><span style={{fontSize:"9px",color:"#3a4252"}}>({noWikiChars.length})</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:"10px",opacity:.7}}>
+                  {noWikiChars.map(c=><CharCard key={c.id} c={c}/>)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* مودال المطور */}
+        {devOpen && <DevModal pw={devPw} setPw={setDevPw} err={devErr} onLogin={loginDev} onClose={()=>{setDevOpen(false);setDevPw("");setDevErr(false);}}/>}
+
+        {/* مودال إدارة المصطلحات */}
+        {termsManagerOpen && (
+          <TermsManager terms={terms} onClose={()=>setTermsManagerOpen(false)}
+            initialEditTerm={typeof termsManagerOpen==="object"?termsManagerOpen:null}
+            onSave={async(t)=>{ const saved=await upsertTerm(t); if(saved){ setTerms(prev=>{ const i=prev.findIndex(x=>x.id===saved.id); if(i>=0){const a=[...prev];a[i]=saved;return a;} return [...prev,saved].sort((a,b)=>a.term.localeCompare(b.term,'ar')); }); } return saved; }}
+            onDelete={async(id)=>{ const ok=await deleteTerm(id); if(ok) setTerms(prev=>prev.filter(t=>t.id!==id)); return ok; }}/>
+        )}
+      </div>
+    );
+  }
+
+  /* ═══ تحميل ═══ */
+  if(loading) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#06080e"}}>
+      <div style={{color:"#a78bfa",fontSize:"16px",fontWeight:"700",animation:"pulse 1.5s infinite"}}>⚔ جاري التحميل...</div>
+    </div>
+  );
+
+  /* ═══ غير موجود ═══ */
+  if(notFound) return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#06080e",gap:"12px"}}>
+      <div style={{fontSize:"48px"}}>⚠</div>
+      <div style={{fontSize:"16px",color:"#ef4444",fontWeight:"700"}}>الشخصية غير موجودة</div>
+      <button onClick={()=>{setCharId(null);setBrowsing(true);}}
+        style={{padding:"8px 20px",background:"#0c1428",border:"1px solid #3b82f6",borderRadius:"8px",
+          color:"#60a5fa",fontSize:"12px",cursor:"pointer",fontFamily:"inherit"}}>
+        ← العودة للويكي
+      </button>
+    </div>
+  );
+
+  /* ═══════════════════════════════════
+     صفحة الشخصية
+  ═══════════════════════════════════ */
+  const cc   = contColor(wiki?.continent || char?.continent || "دراثنار");
+  const rc   = raceColor(char?.race || "إنسان");
+  const img  = char?.image_url || null;
+  const name = char?.name || "شخصية";
+  const race = char?.race || "";
+  const lvl  = char?.level || 1;
+  const bg   = char?.background || "";
+  const stats= char?.stats || [];
+  const skills = (char?.skills || []).filter(s=>s.level && s.level !== "غير متعلم");
+  const classes= char?.classes || [];
+  const fameLevel = char?.fame_level || "";
+  const reputation = char?.reputation ?? 0;
+  const mentalHealth = char?.mental_health ?? 8;
+  const mbti = char?.mbti || "";
+  const moral = char?.moral || "";
+  const displayCity = wiki?.city || char?.city || "";
+  const displayContinent = wiki?.continent || char?.continent || "دراثنار";
+
+  /* مجموعة السمات لرسم البار */
+  const statMax = {"حيوان":22,"بهائم الظلام":24,"رؤوس الكلاب":27,"إنسان":30,"ساروفيان":33,"إتشيرما":36,"سيلافين":36,"وحش الظلام":36,"آلزاداكايند":40,"ساروفيان خرافي":40,"سكارد":50}[race]||30;
+
+  /* الإحصاءات القتالية */
+  const combatStats = [
+    { label:"HP",     value:char?.hp_max??char?.hp??0,  color:"#ef4444",  icon:"❤" },
+    { label:"الهالة", value:char?.hala_max??char?.hala??0, color:"#a855f7", icon:"💜" },
+    { label:"الدفاع", value:char?.defense??0,            color:"#3b82f6",  icon:"🛡" },
+    { label:"المناعة",value:char?.immunity??0,           color:"#22c55e",  icon:"✦" },
+    { label:"الحجم",  value:`${char?.char_size??170}سم`, color:"#f59e0b",  icon:"📏" },
+  ];
+
+  /* أعلى المهارات */
+  const topSkills = [...skills].sort((a,b)=>{
+    const ai = SKILL_LEVELS_ORDER.indexOf(a.level);
+    const bi = SKILL_LEVELS_ORDER.indexOf(b.level);
+    return bi - ai;
+  }).slice(0,8);
+
+  /* التحولات */
+  const transforms = char?.transformations || [];
+
+  const wikiDesc    = editing ? draft?.description    : (wiki?.description    || "");
+  const wikiCity    = editing ? draft?.city           : displayCity;
+  const wikiCont    = editing ? draft?.continent      : displayContinent;
+  const wikiRelated = editing ? (draft?.relatedChars||[]) : (wiki?.relatedChars||[]);
+  const wikiExtra   = editing ? (draft?.extraSections||[]) : (wiki?.extraSections||[]);
+  const wikiHashtags= editing ? (draft?.hashtags||[])     : (wiki?.hashtags||[]);
+  const wikiImages  = editing ? (draft?.images||[])       : (wiki?.images||[]);
+
+  return (
+    <div style={{minHeight:"100vh",background:"#06080e"}}>
+
+      {/* ══ هيدر الصورة + التدرج ══ */}
+      <div style={{position:"relative",width:"100%",minHeight:"320px",overflow:"hidden"}}>
+        {/* خلفية القارة */}
+        <div style={{position:"absolute",inset:0,
+          background:`radial-gradient(ellipse 120% 80% at 50% 0%, ${cc}25 0%, ${cc}08 50%, transparent 75%)`}}/>
+        <div style={{position:"absolute",inset:0,
+          background:`linear-gradient(to bottom, ${cc}14 0%, ${cc}06 40%, #06080e 100%)`}}/>
+
+        {/* صورة الشخصية */}
+        {img && !imgErr ? (
+          <div style={{position:"absolute",inset:0}}>
+            <img src={img} onError={()=>setImgErr(true)}
+              style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top center",
+                filter:"brightness(.75) contrast(1.05)"}}/>
+            <div style={{position:"absolute",inset:0,
+              background:`linear-gradient(to bottom, transparent 20%, ${cc}12 50%, #06080e 85%)`}}/>
+            <div style={{position:"absolute",inset:0,
+              background:"linear-gradient(to bottom, transparent 30%, #06080e 100%)",opacity:.7}}/>
+          </div>
+        ) : (
+          /* placeholder ديناميكي */
+          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontSize:"80px",opacity:.08}}>{(name)[0]}</span>
+          </div>
+        )}
+
+        {/* نافبار علوي */}
+        <div style={{position:"relative",zIndex:10,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px 0"}}>
+          <button onClick={()=>{setCharId(null);setBrowsing(true);}}
+            style={{background:"#06080ecc",border:`1px solid ${cc}44`,borderRadius:"8px",
+              padding:"5px 12px",color:cc,fontSize:"11px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>
+            ← الويكي
+          </button>
+          <div style={{display:"flex",gap:"6px"}}>
+            {devMode && !editing && (
+              <button onClick={startEdit}
+                style={{background:"#0c1428cc",border:"1px solid #3b82f6",borderRadius:"8px",
+                  padding:"5px 14px",color:"#60a5fa",fontSize:"11px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>
+                ✏ تحرير الويكي
+              </button>
+            )}
+            {!devMode && (
+              <button onClick={()=>setDevOpen(true)}
+                style={{padding:"5px 12px",background:"#06080ecc",border:"1px solid #374151",borderRadius:"8px",
+                  color:"#4b5563",fontSize:"9px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>
+                🔒 مطور
+              </button>
+            )}
+            {devMode && (
+              <button onClick={()=>{setDevMode(false);try{localStorage.removeItem(DEV_SESSION_KEY);}catch(e){}}}
+                style={{padding:"5px 12px",background:"#7c3aed22cc",border:"1px solid #7c3aed",borderRadius:"8px",
+                  color:"#a78bfa",fontSize:"9px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>
+                🔓 مطور
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* معلومات الشخصية فوق التدرج */}
+        <div style={{position:"relative",zIndex:10,padding:"0 16px",paddingBottom:"0",marginTop:"auto",
+          display:"flex",flexDirection:"column",justifyContent:"flex-end",
+          minHeight:"240px"}}>
+          <div style={{marginTop:"auto",paddingTop:"180px",paddingBottom:"16px"}}>
+
+            {/* العرق + المستوى */}
+            <div style={{display:"flex",gap:"6px",marginBottom:"6px",flexWrap:"wrap"}}>
+              <span style={{background:`${rc}22`,border:`1px solid ${rc}55`,color:rc,
+                fontSize:"10px",fontWeight:"700",borderRadius:"5px",padding:"2px 10px"}}>{race}</span>
+              <span style={{background:"#1e274099",color:"#94a3b8",
+                fontSize:"10px",borderRadius:"5px",padding:"2px 10px"}}>مستوى {lvl}</span>
+              {char?.life_grade && (
+                <span style={{background:"#1e274099",color:"#64748b",
+                  fontSize:"10px",borderRadius:"5px",padding:"2px 10px"}}>درجة {char.life_grade}</span>
+              )}
+              {mbti && (
+                <span style={{background:"#a78bfa22",border:"1px solid #a78bfa44",color:"#a78bfa",
+                  fontSize:"10px",borderRadius:"5px",padding:"2px 10px"}}>{mbti}</span>
+              )}
+              {moral && (
+                <span style={{background:"#f59e0b22",border:"1px solid #f59e0b44",color:"#f59e0b",
+                  fontSize:"10px",borderRadius:"5px",padding:"2px 10px"}}>{moral}</span>
+              )}
+            </div>
+
+            {/* الاسم */}
+            <div style={{fontSize:"30px",fontWeight:"900",color:"#f1f5f9",lineHeight:"1.1",
+              textShadow:`0 2px 20px ${cc}66,0 0 40px #000`}}>{name}</div>
+            {char?.title && (
+              <div style={{fontSize:"13px",color:cc,fontWeight:"600",marginTop:"3px",opacity:.9}}>{char.title}</div>
+            )}
+
+            {/* المكان */}
+            <div style={{display:"flex",gap:"10px",marginTop:"8px",flexWrap:"wrap"}}>
+              {(wikiCity||displayCity) && (
+                <span style={{fontSize:"11px",color:"#94a3b8"}}>
+                  🏙️ {wikiCity || displayCity}
+                </span>
+              )}
+              <span style={{fontSize:"11px",color:cc,fontWeight:"600"}}>
+                🌍 {CONTINENT_LABEL[wikiCont||displayContinent] || wikiCont || displayContinent}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ══ المحتوى ══ */}
+      <div style={{maxWidth:"640px",margin:"0 auto",padding:"16px 16px 40px"}}>
+
+        {/* ── شريط التحرير ── */}
+        {editing && (
+          <div style={{background:"#0c1020",border:"1px solid #3b82f633",borderRadius:"12px",
+            padding:"12px 14px",marginBottom:"16px",animation:"fi .2s ease"}}>
+            <div style={{fontSize:"11px",color:"#60a5fa",fontWeight:"700",marginBottom:"10px"}}>✏ وضع تحرير الويكي</div>
+
+            {/* القارة والمدينة */}
+            <div style={{display:"flex",gap:"8px",marginBottom:"10px",flexWrap:"wrap"}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"4px",fontWeight:"700"}}>القارة</div>
+                <select value={draft?.continent||"دراثنار"} onChange={e=>setDraft(p=>({...p,continent:e.target.value}))}
+                  style={{width:"100%",background:"#080b14",border:"1px solid #1e2740",borderRadius:"7px",
+                    color:contColor(draft?.continent),fontSize:"12px",fontWeight:"700",padding:"6px 9px",
+                    fontFamily:"inherit",direction:"rtl",cursor:"pointer"}}>
+                  {CONTINENTS.map(c=><option key={c} value={c} style={{background:"#080b14",color:"#e2e8f0"}}>{CONTINENT_LABEL[c]||c}</option>)}
+                </select>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"4px",fontWeight:"700"}}>المدينة</div>
+                <input value={draft?.city||""} onChange={e=>setDraft(p=>({...p,city:e.target.value}))}
+                  placeholder="اسم المدينة..."
+                  style={{width:"100%",background:"#080b14",border:"1px solid #1e2740",borderRadius:"7px",
+                    color:"#e2e8f0",fontSize:"12px",padding:"6px 9px",fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+              </div>
+            </div>
+
+            {/* الوصف */}
+            <WikiTextArea
+              label="📝 وصف الشخصية"
+              value={draft?.description}
+              onChange={v=>setDraft(p=>({...p,description:v}))}
+              placeholder="اكتب وصفاً شاملاً للشخصية — شخصيتها، مظهرها، تاريخها، دوافعها..."
+              rows={6}
+            />
+
+            {/* معرض الصور */}
+            <div style={{marginBottom:"10px"}}>
+              <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"6px",fontWeight:"700",letterSpacing:".06em"}}>🖼 معرض الصور</div>
+              <ImageGallery images={draft?.images||[]} editing={true}
+                onChange={imgs=>setDraft(p=>({...p,images:imgs}))}/>
+            </div>
+
+            {/* الوسوم/الهاشتاقات */}
+            <div style={{marginBottom:"10px"}}>
+              <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"6px",fontWeight:"700",letterSpacing:".06em"}}>🏷 الوسوم</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"8px"}}>
+                {(draft?.hashtags||[]).map(t=>(
+                  <span key={t} onClick={()=>removeHashtag(t)}
+                    style={{background:"#3b82f622",border:"1px solid #3b82f655",color:"#93c5fd",
+                      fontSize:"10px",fontWeight:"700",borderRadius:"6px",padding:"3px 9px",
+                      cursor:"pointer",fontFamily:"inherit"}}>
+                    #{t} ×
+                  </span>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:"6px"}}>
+                <input value={tagInput} onChange={e=>setTagInput(e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addHashtag();}}}
+                  placeholder="اكتب وسماً ثم Enter — مثال: سكارد"
+                  style={{flex:1,background:"#080b14",border:"1px solid #1e2740",borderRadius:"7px",
+                    color:"#e2e8f0",fontSize:"11px",padding:"6px 9px",fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+                <button onClick={addHashtag}
+                  style={{padding:"6px 14px",background:"#3b82f622",border:"1px solid #3b82f655",borderRadius:"7px",
+                    color:"#93c5fd",fontSize:"11px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>+</button>
+              </div>
+            </div>
+
+            {/* الشخصيات المرتبطة */}
+            <div style={{marginBottom:"10px"}}>
+              <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"6px",fontWeight:"700",letterSpacing:".06em"}}>🔗 الشخصيات المرتبطة</div>
+              {(draft?.relatedChars||[]).map((r,i)=>(
+                <RelEditor key={r.charId||i} rel={r} allChars={allChars}
+                  onChange={nr=>setDraft(p=>({...p,relatedChars:p.relatedChars.map((x,j)=>j===i?nr:x)}))}
+                  onRemove={()=>setDraft(p=>({...p,relatedChars:p.relatedChars.filter((_,j)=>j!==i)}))}/>
+              ))}
+              <button onClick={()=>setRelPickOpen(p=>!p)}
+                style={{width:"100%",padding:"7px",background:"transparent",border:"1px dashed #3b82f644",
+                  borderRadius:"8px",color:"#3b82f6",fontSize:"11px",cursor:"pointer",fontFamily:"inherit"}}>
+                {relPickOpen ? "✕ إغلاق" : "+ إضافة شخصية مرتبطة"}
+              </button>
+              {relPickOpen && (
+                <div style={{marginTop:"8px",background:"#080b14",border:"1px solid #1e2740",borderRadius:"8px",padding:"8px",animation:"fi .15s ease"}}>
+                  <input placeholder="🔍 ابحث..."
+                    style={{width:"100%",background:"#0c1020",border:"1px solid #1e2740",borderRadius:"6px",
+                      color:"#c4cce0",fontSize:"11px",padding:"5px 8px",marginBottom:"6px",
+                      fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}
+                    onChange={e=>setCharSearch(e.target.value)}/>
+                  <div style={{maxHeight:"160px",overflowY:"auto",display:"flex",flexDirection:"column",gap:"4px"}}>
+                    {allChars.filter(c=>c.id!==charId&&!draft?.relatedChars?.find(r=>r.charId===c.id)).filter(c=>{
+                      const q=charSearch.trim().toLowerCase();
+                      return !q||(c.name||"").toLowerCase().includes(q)||(c.race||"").toLowerCase().includes(q);
+                    }).map(c=>(
+                      <button key={c.id} onClick={()=>addRelated(c)}
+                        style={{display:"flex",alignItems:"center",gap:"7px",padding:"5px 8px",
+                          background:"#0c1428",border:`1px solid ${raceColor(c.race)}33`,borderRadius:"6px",
+                          cursor:"pointer",fontFamily:"inherit",textAlign:"right"}}>
+                        <div style={{width:"22px",height:"22px",borderRadius:"50%",flexShrink:0,
+                          background:`${raceColor(c.race)}22`,border:`1px solid ${raceColor(c.race)}55`,
+                          overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {c.image_url
+                            ?<img src={c.image_url} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                            :<span style={{fontSize:"9px",color:raceColor(c.race),fontWeight:"700"}}>{(c.name||"؟")[0]}</span>}
+                        </div>
+                        <span style={{fontSize:"11px",color:"#c4cce0",fontWeight:"600"}}>{c.name}</span>
+                        <span style={{fontSize:"9px",color:raceColor(c.race),marginRight:"auto"}}>{c.race}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* أقسام إضافية */}
+            <div style={{marginBottom:"10px"}}>
+              <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"6px",fontWeight:"700",letterSpacing:".06em"}}>📌 أقسام إضافية</div>
+              {(draft?.extraSections||[]).map((sec,i)=>(
+                <div key={i} style={{background:"#09101e",border:"1px solid #1e2740",borderRadius:"8px",padding:"8px 10px",marginBottom:"6px"}}>
+                  <div style={{display:"flex",gap:"6px",marginBottom:"6px",alignItems:"center"}}>
+                    <input value={sec.title||""} onChange={e=>setDraft(p=>({...p,extraSections:p.extraSections.map((s,j)=>j===i?{...s,title:e.target.value}:s)}))}
+                      placeholder="عنوان القسم..."
+                      style={{flex:1,background:"#080b14",border:"1px solid #1e2740",borderRadius:"5px",
+                        color:"#e879f9",fontSize:"11px",fontWeight:"700",padding:"4px 8px",
+                        fontFamily:"inherit",direction:"rtl"}}/>
+                    <button onClick={()=>setDraft(p=>({...p,extraSections:p.extraSections.filter((_,j)=>j!==i)}))}
+                      style={{background:"#ef444422",border:"1px solid #ef444433",borderRadius:"5px",
+                        color:"#ef4444",fontSize:"11px",padding:"2px 7px",cursor:"pointer",fontFamily:"inherit"}}>×</button>
+                  </div>
+                  <textarea value={sec.content||""} rows={3}
+                    onChange={e=>setDraft(p=>({...p,extraSections:p.extraSections.map((s,j)=>j===i?{...s,content:e.target.value}:s)}))}
+                    placeholder="محتوى القسم..."
+                    style={{width:"100%",background:"#080b14",border:"1px solid #1e2740",borderRadius:"6px",
+                      color:"#94a3b8",fontSize:"11px",padding:"6px 8px",lineHeight:"1.7",resize:"none",
+                      fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+                </div>
+              ))}
+              <div style={{display:"flex",gap:"6px"}}>
+                <input value={secTitle} onChange={e=>setSecTitle(e.target.value)}
+                  placeholder="عنوان القسم الجديد..."
+                  style={{flex:1,background:"#080b14",border:"1px solid #1e2740",borderRadius:"7px",
+                    color:"#e2e8f0",fontSize:"11px",padding:"5px 9px",fontFamily:"inherit",direction:"rtl"}}/>
+                <button onClick={()=>{
+                    const t=secTitle.trim();
+                    if(!t) return;
+                    setDraft(p=>({...p,extraSections:[...(p.extraSections||[]),{title:t,content:""}]}));
+                    setSecTitle("");
+                  }}
+                  style={{padding:"5px 14px",background:"#e879f922",border:"1px solid #e879f944",
+                    borderRadius:"7px",color:"#e879f9",fontSize:"11px",cursor:"pointer",fontFamily:"inherit",fontWeight:"700"}}>
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* أزرار الحفظ / الإلغاء */}
+            <div style={{display:"flex",gap:"8px",marginTop:"12px"}}>
+              <button onClick={saveWiki} disabled={saving}
+                style={{flex:1,padding:"10px",background:saving?"#1e2535":"#052e16",
+                  border:"1px solid #16a34a",borderRadius:"9px",color:saving?"#5a6478":"#4ade80",
+                  fontSize:"13px",fontWeight:"700",cursor:saving?"default":"pointer",fontFamily:"inherit"}}>
+                {saving?"⏳ جاري الحفظ...":saveOk?"✓ تم!":"💾 حفظ"}
+              </button>
+              <button onClick={()=>{setEditing(false);setDraft(null);}}
+                style={{padding:"10px 16px",background:"transparent",border:"1px solid #1e2740",
+                  borderRadius:"9px",color:"#7a8599",fontSize:"13px",cursor:"pointer",fontFamily:"inherit"}}>
+                إلغاء
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── الوصف ── */}
+        {(wikiDesc||editing) && (
+          <WikiSection title="نبذة" icon="📖" accent={cc}>
+            {wikiDesc
+              ? <p style={{fontSize:"13px",color:"#cbd5e1",lineHeight:"2",whiteSpace:"pre-wrap",
+                  background:"#090c18",borderRadius:"10px",padding:"14px 16px",
+                  border:`1px solid ${cc}22`}}>
+                  <TermLinkedText text={wikiDesc} terms={terms} onTermClick={openTermPopup}/>
+                </p>
+              : <p style={{fontSize:"11px",color:"#3a4460",fontStyle:"italic"}}>لا يوجد وصف بعد — اضغط "تحرير الويكي" لإضافته</p>
+            }
+          </WikiSection>
+        )}
+
+        {/* ── معرض الصور ── */}
+        {!editing && wikiImages.length>0 && (
+          <WikiSection title="معرض الصور" icon="🖼" accent={cc}>
+            <ImageGallery images={wikiImages} editing={false} onChange={()=>{}}/>
+          </WikiSection>
+        )}
+
+        {/* ── الوسوم ── */}
+        {!editing && wikiHashtags.length>0 && (
+          <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"16px"}}>
+            {wikiHashtags.map(t=>(
+              <HashtagPill key={t} tag={t} onClick={()=>{setCharId(null);setBrowsing(true);setTagFilter(t);}}/>
+            ))}
+          </div>
+        )}
+
+        {/* ── المعلومات الأساسية ── */}
+        <WikiSection title="المعلومات الأساسية" icon="📋" accent={cc}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
+            {[
+              { label:"العرق",      value:race,         color:rc },
+              { label:"المستوى",    value:lvl,          color:"#94a3b8" },
+              { label:"درجة الحياة",value:char?.life_grade||"—", color:"#7a8599" },
+              { label:"الخلفية",    value:bg||"—",      color:"#7a8599" },
+              { label:"الشهرة",     value:fameLevel||"—",color:"#f59e0b" },
+              { label:"القارة",     value:CONTINENT_LABEL[wikiCont]||wikiCont||"—", color:cc },
+              { label:"المدينة",    value:wikiCity||"—",color:"#94a3b8" },
+              ...(mbti  ? [{ label:"MBTI",   value:mbti,  color:"#a78bfa" }] : []),
+              ...(moral ? [{ label:"التوجه", value:moral, color:"#f59e0b" }] : []),
+              ...(char?.animal_type ? [{ label:"الكائن", value:char.animal_type, color:"#84cc16" }] : []),
+            ].map(({label,value,color})=>(
+              <div key={label} style={{background:"#090c18",border:"1px solid #1e274055",borderRadius:"8px",padding:"8px 10px"}}>
+                <div style={{fontSize:"8px",color:"#4a5568",marginBottom:"2px",fontWeight:"700"}}>{label}</div>
+                <div style={{fontSize:"12px",fontWeight:"700",color}}>{value}</div>
+              </div>
+            ))}
+          </div>
+        </WikiSection>
+
+        {/* ── الكلاسات ── */}
+        {classes.length>0 && classes.some(c=>c.cls&&c.cls!=="—"&&c.cls!=="لا شيء") && (
+          <WikiSection title="التخصصات" icon="⚡" accent={cc}>
+            <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+              {classes.filter(c=>c.cls&&c.cls!=="—"&&c.cls!=="لا شيء").map((cls,i)=>(
+                <div key={i} style={{background:"#090c18",border:`1px solid ${cc}33`,borderRadius:"8px",padding:"8px 12px"}}>
+                  <div style={{fontSize:"12px",fontWeight:"700",color:i===0?cc:"#94a3b8"}}>{cls.cls}</div>
+                  {cls.sub && <div style={{fontSize:"10px",color:"#7a8599",marginTop:"1px"}}>{cls.sub}</div>}
+                  {cls.path && <div style={{fontSize:"9px",color:"#4a5568",marginTop:"2px"}}>↪ {cls.path}</div>}
+                </div>
+              ))}
+            </div>
+          </WikiSection>
+        )}
+
+        {/* ── الإحصاءات القتالية ── */}
+        <WikiSection title="الإحصاءات" icon="⚔" accent={cc} defaultOpen={false}>
+          {/* بارات السمات */}
+          {stats.length>0 && (
+            <div style={{background:"#090c18",border:`1px solid ${cc}22`,borderRadius:"10px",padding:"14px 16px",marginBottom:"10px"}}>
+              <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"10px",fontWeight:"700",letterSpacing:".06em"}}>السمات السبع</div>
+              {stats.map(s=>(
+                <StatBadge key={s.name} name={s.name} value={s.value} max={statMax}/>
+              ))}
+              <div style={{borderTop:"1px solid #1e2535",marginTop:"6px",paddingTop:"6px",
+                display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:"9px",color:"#4a5568"}}>المجموع</span>
+                <span style={{fontSize:"11px",fontWeight:"700",color:cc}}>{stats.reduce((a,s)=>a+s.value,0)} / {statMax}</span>
+              </div>
+            </div>
+          )}
+
+          {/* الإحصاءات القتالية */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:"6px"}}>
+            {combatStats.map(({label,value,color,icon})=>(
+              <div key={label} style={{background:"#090c18",border:`1px solid ${color}22`,borderRadius:"8px",padding:"10px 10px 8px",textAlign:"center"}}>
+                <div style={{fontSize:"14px",marginBottom:"2px"}}>{icon}</div>
+                <div style={{fontSize:"15px",fontWeight:"800",color}}>{value}</div>
+                <div style={{fontSize:"9px",color:"#5a6478",marginTop:"2px"}}>{label}</div>
+              </div>
+            ))}
+            {(char?.true_defense||0)>0 && (
+              <div style={{background:"#090c18",border:"1px solid #3b82f622",borderRadius:"8px",padding:"10px 10px 8px",textAlign:"center"}}>
+                <div style={{fontSize:"14px",marginBottom:"2px"}}>🔰</div>
+                <div style={{fontSize:"15px",fontWeight:"800",color:"#3b82f6"}}>{char.true_defense}</div>
+                <div style={{fontSize:"9px",color:"#5a6478",marginTop:"2px"}}>الدفاع الحقيقي</div>
+              </div>
+            )}
+            {(char?.dmg_reduce||0)>0 && (
+              <div style={{background:"#090c18",border:"1px solid #a855f722",borderRadius:"8px",padding:"10px 10px 8px",textAlign:"center"}}>
+                <div style={{fontSize:"14px",marginBottom:"2px"}}>🌀</div>
+                <div style={{fontSize:"15px",fontWeight:"800",color:"#a855f7"}}>{char.dmg_reduce}٪</div>
+                <div style={{fontSize:"9px",color:"#5a6478",marginTop:"2px"}}>تقليل الضرر</div>
+              </div>
+            )}
+          </div>
+        </WikiSection>
+
+        {/* ── المهارات البارزة ── */}
+        {topSkills.length>0 && (
+          <WikiSection title="المهارات" icon="✦" accent={cc} defaultOpen={false}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+              {topSkills.map(sk=>{
+                const col = STAT_COLOR[sk.stat] || "#9ca3af";
+                const sym = SKILL_LEVEL_SYMBOL[sk.level] || "○";
+                const lCol = skillColor(sk.level);
+                const total = (parseInt(sk.bonus)||0)+(parseInt(sk.extraBonus)||0);
+                return(
+                  <div key={sk.id||sk.name} style={{background:"#090c18",border:`1px solid ${col}22`,
+                    borderRadius:"7px",padding:"6px 10px",display:"flex",gap:"6px",alignItems:"center"}}>
+                    <span style={{fontSize:"10px",color:lCol}}>{sym}</span>
+                    <span style={{fontSize:"11px",fontWeight:"700",color:"#c4cce0"}}>{sk.name}</span>
+                    <span style={{fontSize:"9px",color:col,fontWeight:"700",background:`${col}18`,
+                      borderRadius:"3px",padding:"0 4px"}}>{sk.level}</span>
+                    {total>0&&<span style={{fontSize:"9px",color:"#5a6478"}}>+{total}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </WikiSection>
+        )}
+
+        {/* ── اللغات ── */}
+        {(char?.languages||[]).length>0 && (
+          <WikiSection title="اللغات" icon="🗣" accent={cc} defaultOpen={false}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+              {(char.languages||[]).map(lang=>(
+                <span key={lang} style={{background:"#e879f922",border:"1px solid #e879f944",color:"#e879f9",
+                  fontSize:"11px",fontWeight:"600",borderRadius:"6px",padding:"4px 10px"}}>{lang}</span>
+              ))}
+            </div>
+          </WikiSection>
+        )}
+
+        {/* ── التحولات ── */}
+        {transforms.length>0 && (
+          <WikiSection title="التحولات" icon="🌀" accent={cc} defaultOpen={false}>
+            <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+              {transforms.map((t,i)=>{
+                let tImg=null; try{ tImg=localStorage.getItem(`amazad_img_${char?.id}_t${i+1}`)||t._imgData||null; }catch(e){}
+                return(
+                  <div key={i} style={{background:"#090c18",border:`1px solid ${cc}33`,borderRadius:"10px",
+                    padding:"10px 12px",display:"flex",gap:"10px",alignItems:"flex-start"}}>
+                    {tImg && (
+                      <div style={{width:"48px",height:"48px",borderRadius:"8px",overflow:"hidden",
+                        border:`1px solid ${cc}44`,flexShrink:0}}>
+                        <img src={tImg} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                      </div>
+                    )}
+                    <div>
+                      <div style={{fontSize:"12px",fontWeight:"700",color:cc}}>{t.name||`تحول ${i+1}`}</div>
+                      {t.race&&<div style={{fontSize:"10px",color:"#7a8599",marginTop:"2px"}}>{t.race}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </WikiSection>
+        )}
+
+        {/* ── الأسلحة والمعدات ── */}
+        {(char?.weapons||[]).length>0 && (
+          <WikiSection title="الأسلحة والمعدات" icon="⚔" accent={cc} defaultOpen={false}>
+            <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
+              {(char.weapons||[]).map((w,i)=>(
+                <div key={i} style={{background:"#090c18",border:`1px solid ${w.qualityColor||"#eab308"}33`,
+                  borderRadius:"8px",padding:"8px 12px",
+                  borderRight:`3px solid ${w.qualityColor||"#eab308"}55`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                    <span style={{fontSize:"12px",fontWeight:"700",color:w.qualityColor||"#eab308"}}>{w.name}</span>
+                    <span style={{fontSize:"9px",fontWeight:"700",color:w.qualityColor||"#eab308",
+                      background:`${w.qualityColor||"#eab308"}18`,borderRadius:"3px",padding:"1px 5px"}}>{w.qualityLabel}</span>
+                  </div>
+                  {w.damage&&<div style={{fontSize:"10px",color:"#f97316",marginTop:"2px"}}>⚔ {w.damage}</div>}
+                  {w.notes&&<div style={{fontSize:"10px",color:"#7a8599",marginTop:"2px"}}>{w.notes}</div>}
+                </div>
+              ))}
+            </div>
+          </WikiSection>
+        )}
+
+        {/* ── القدرات الخاصة ── */}
+        {(()=>{
+          const tables = char?.abilities?._abilityTables || {};
+          const hasAny = Object.values(tables).some(arr=>arr&&arr.length>0);
+          if(!hasAny) return null;
+          const META = [
+            {key:"classAbilities",title:"قدرات الكلاس",accent:cc},
+            {key:"raceWeaponAbilities",title:"قدرات العرق والسلاح",accent:rc},
+            {key:"statAbilities",title:"قدرات السمات",accent:"#3b82f6"},
+            {key:"otherAbilities",title:"قدرات أخرى",accent:"#ec4899"},
+          ];
+          return(
+            <WikiSection title="القدرات الخاصة" icon="✨" accent={cc} defaultOpen={false}>
+              {META.map(({key,title,accent})=>{
+                const items = tables[key]||[];
+                if(!items.length) return null;
+                return(
+                  <div key={key} style={{marginBottom:"10px"}}>
+                    <div style={{fontSize:"10px",color:accent,fontWeight:"700",marginBottom:"6px"}}>{title}</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:"5px"}}>
+                      {items.map(ab=>(
+                        <div key={ab.id} style={{background:"#090c18",border:`1px solid ${accent}22`,
+                          borderRadius:"8px",padding:"8px 11px",borderRight:`2px solid ${accent}55`}}>
+                          <div style={{fontSize:"11px",fontWeight:"700",color:accent,marginBottom:"3px"}}>{ab.title}</div>
+                          {ab.content&&<div style={{fontSize:"10px",color:"#94a3b8",lineHeight:"1.7",whiteSpace:"pre-wrap"}}>{ab.content}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </WikiSection>
+          );
+        })()}
+
+        {/* ── الشخصيات المرتبطة ── */}
+        {wikiRelated.length>0 && (
+          <WikiSection title="الشخصيات المرتبطة" icon="🔗" accent={cc}>
+            <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+              {wikiRelated.map((r,i)=>(
+                <RelatedCharCard key={r.charId||i} rc={r} allChars={allChars} onClick={openChar}/>
+              ))}
+            </div>
+          </WikiSection>
+        )}
+
+        {/* ── أقسام إضافية ── */}
+        {wikiExtra.map((sec,i)=>(
+          <WikiSection key={i} title={sec.title||`قسم ${i+1}`} icon="📌" accent="#e879f9">
+            <p style={{fontSize:"13px",color:"#cbd5e1",lineHeight:"2",whiteSpace:"pre-wrap",
+              background:"#090c18",borderRadius:"10px",padding:"14px 16px",
+              border:"1px solid #e879f922"}}>
+              <TermLinkedText text={sec.content} terms={terms} onTermClick={openTermPopup}/>
+            </p>
+          </WikiSection>
+        ))}
+
+        {/* ── لا يوجد محتوى ويكي بعد ── */}
+        {!wikiDesc && wikiRelated.length===0 && wikiExtra.length===0 && wikiHashtags.length===0 && wikiImages.length===0 && !editing && (
+          <div style={{textAlign:"center",padding:"30px 0",color:"#2d3748"}}>
+            <div style={{fontSize:"32px",marginBottom:"8px",opacity:.4}}>📖</div>
+            <div style={{fontSize:"12px"}}>لا يوجد محتوى ويكي لهذه الشخصية بعد</div>
+            {devMode && (
+              <button onClick={startEdit}
+                style={{marginTop:"12px",padding:"7px 18px",background:"#0c1428",border:"1px solid #3b82f6",
+                  borderRadius:"8px",color:"#60a5fa",fontSize:"11px",cursor:"pointer",fontFamily:"inherit"}}>
+                ✏ إنشاء صفحة الويكي
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── زر الرجوع للملف الرئيسي ── */}
+        <div style={{textAlign:"center",marginTop:"24px",borderTop:"1px solid #1e2535",paddingTop:"18px"}}>
+          <a href={`amazad-44-2.html?char=${charId}`}
+            style={{fontSize:"10px",color:"#4a5568",textDecoration:"none"}}>
+            ← العودة لملف الشخصية
+          </a>
+        </div>
+
+        <div style={{fontSize:"9px",color:"#1a2030",textAlign:"center",marginTop:"14px"}}>Amazad Wiki — موسوعة عالم أمازاد TTRPG</div>
+      </div>
+
+      {/* ══ مودال المطور ══ */}
+      {devOpen && <DevModal pw={devPw} setPw={setDevPw} err={devErr} onLogin={loginDev} onClose={()=>{setDevOpen(false);setDevPw("");setDevErr(false);}}/>}
+
+      {/* ══ نافذة تعريف مصطلح ══ */}
+      {termPopup && (
+        <TermPopup term={termPopup} terms={terms} onTermClick={openTermPopup} onClose={()=>setTermPopup(null)}
+          devMode={devMode} onEdit={(t)=>setTermsManagerOpen(t)}/>
+      )}
+
+      {/* ══ مودال إدارة المصطلحات (يمكن فتحه من صفحة الشخصية أيضاً) ══ */}
+      {termsManagerOpen && (
+        <TermsManager terms={terms} onClose={()=>setTermsManagerOpen(false)}
+          initialEditTerm={typeof termsManagerOpen==="object"?termsManagerOpen:null}
+          onSave={async(t)=>{ const saved=await upsertTerm(t); if(saved){ setTerms(prev=>{ const i=prev.findIndex(x=>x.id===saved.id); if(i>=0){const a=[...prev];a[i]=saved;return a;} return [...prev,saved].sort((a,b)=>a.term.localeCompare(b.term,'ar')); }); } return saved; }}
+          onDelete={async(id)=>{ const ok=await deleteTerm(id); if(ok) setTerms(prev=>prev.filter(t=>t.id!==id)); return ok; }}/>
+      )}
+    </div>
+  );
+}
+
+/* ══ مودال كلمة سر المطور ══ */
+function DevModal({ pw, setPw, err, onLogin, onClose }) {
+  const ref = useRef();
+  useEffect(()=>{ setTimeout(()=>ref.current?.focus(),100); },[]);
+  return(
+    <div onClick={e=>{if(e.target===e.currentTarget)onClose();}}
+      style={{position:"fixed",inset:0,background:"#00000099",zIndex:9999,
+        display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+      <div style={{background:"#0a0e1a",border:"1px solid #7c3aed55",borderRadius:"16px",
+        width:"100%",maxWidth:"320px",padding:"24px 20px",animation:"fi .2s ease"}}>
+        <div style={{fontSize:"15px",fontWeight:"900",color:"#e2e8f0",marginBottom:"4px"}}>🔒 وضع المطور</div>
+        <div style={{fontSize:"10px",color:"#5a6478",marginBottom:"16px"}}>أدخل كلمة السر للتعديل على صفحات الويكي</div>
+        <input ref={ref} type="password" value={pw} onChange={e=>setPw(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&onLogin()}
+          placeholder="كلمة السر..."
+          style={{width:"100%",background:"#080b14",border:`1px solid ${err?"#ef4444":"#1e2740"}`,
+            borderRadius:"8px",color:"#e2e8f0",fontSize:"13px",padding:"9px 12px",
+            fontFamily:"inherit",direction:"ltr",transition:"border-color .2s",boxSizing:"border-box"}}/>
+        {err && <div style={{fontSize:"10px",color:"#ef4444",marginTop:"5px"}}>كلمة سر خاطئة</div>}
+        <div style={{display:"flex",gap:"8px",marginTop:"14px"}}>
+          <button onClick={onLogin}
+            style={{flex:1,padding:"9px",background:"#7c3aed",border:"none",borderRadius:"9px",
+              color:"#fff",fontSize:"13px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>
+            دخول
+          </button>
+          <button onClick={onClose}
+            style={{padding:"9px 14px",background:"transparent",border:"1px solid #1e2740",
+              borderRadius:"9px",color:"#7a8599",fontSize:"13px",cursor:"pointer",fontFamily:"inherit"}}>
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══ مدير قاموس المصطلحات ══ */
+function TermsManager({ terms, onClose, onSave, onDelete, initialEditTerm }){
+  const [editing, setEditing] = useState(!!initialEditTerm); // false = قائمة، true = نموذج تحرير/إنشاء
+  const [form, setForm] = useState(initialEditTerm ? { ...initialEditTerm } : null);
+  const [aliasInput, setAliasInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const startNew = () => { setForm({ term:"", aliases:[], definition:"", category:"" }); setEditing(true); };
+  const startEditTerm = (t) => { setForm({ ...t }); setEditing(true); };
+
+  const addAlias = () => {
+    const a = aliasInput.trim();
+    if(!a || !form) return;
+    if((form.aliases||[]).includes(a)){ setAliasInput(""); return; }
+    setForm(p=>({...p,aliases:[...(p.aliases||[]),a]}));
+    setAliasInput("");
+  };
+  const removeAlias = (a) => setForm(p=>({...p,aliases:(p.aliases||[]).filter(x=>x!==a)}));
+
+  const doSave = async () => {
+    if(!form || !form.term.trim()) return;
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+    setEditing(false);
+    setForm(null);
+  };
+  const doDelete = async (id) => {
+    if(!window.confirm("حذف هذا المصطلح نهائياً؟")) return;
+    await onDelete(id);
+  };
+
+  const filtered = (terms||[]).filter(t=>{
+    const s = search.trim();
+    if(!s) return true;
+    return (t.term||"").includes(s) || (t.aliases||[]).some(a=>a.includes(s));
+  });
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:4000,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:"#0a0e1a",border:"1px solid #fbbf2444",borderRadius:"20px 20px 0 0",
+        width:"100%",maxWidth:"480px",padding:"20px 16px 28px",maxHeight:"85vh",display:"flex",flexDirection:"column",animation:"fi .2s ease"}}>
+        <div style={{width:"40px",height:"4px",background:"#232840",borderRadius:"2px",margin:"0 auto 16px",flexShrink:0}}></div>
+
+        {!editing ? (
+          <>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px",flexShrink:0}}>
+              <span style={{fontSize:"16px",fontWeight:"900",color:"#fbbf24"}}>📖 قاموس المصطلحات</span>
+              <div style={{display:"flex",gap:"6px"}}>
+                <button onClick={startNew}
+                  style={{padding:"4px 12px",background:"#fbbf2422",border:"1px solid #fbbf2455",borderRadius:"6px",
+                    color:"#fbbf24",fontSize:"11px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>+ مصطلح جديد</button>
+                <button onClick={onClose}
+                  style={{padding:"4px 10px",background:"transparent",border:"1px solid #1a2035",borderRadius:"6px",
+                    color:"#7a8599",fontSize:"11px",cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+              </div>
+            </div>
+            <input value={search} onChange={e=>setSearch(e.target.value)}
+              placeholder="🔍 ابحث عن مصطلح..."
+              style={{width:"100%",background:"#0b0e1a",border:"1px solid #1e2740",borderRadius:"9px",
+                color:"#c4cce0",fontSize:"12px",padding:"8px 12px",marginBottom:"12px",flexShrink:0,
+                fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+            <div style={{overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:"6px"}}>
+              {filtered.length===0 && (
+                <div style={{fontSize:"11px",color:"#4a5568",textAlign:"center",padding:"20px 0"}}>
+                  {terms.length===0 ? "لا توجد مصطلحات بعد" : "لا توجد نتائج"}
+                </div>
+              )}
+              {filtered.map(t=>(
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:"8px",padding:"9px 11px",
+                  background:"#0c0f1a",border:"1px solid #1e2740",borderRadius:"9px"}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:"12px",fontWeight:"700",color:"#fbbf24"}}>{t.term}</div>
+                    {t.category && <div style={{fontSize:"9px",color:"#7a8599",marginTop:"1px"}}>{t.category}</div>}
+                    {(t.aliases||[]).length>0 && (
+                      <div style={{fontSize:"9px",color:"#4a5568",marginTop:"1px"}}>أيضاً: {t.aliases.join("، ")}</div>
+                    )}
+                  </div>
+                  <button onClick={()=>startEditTerm(t)}
+                    style={{background:"#0c1428",border:"1px solid #3b82f644",borderRadius:"6px",
+                      color:"#60a5fa",fontSize:"10px",padding:"4px 9px",cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>✏</button>
+                  <button onClick={()=>doDelete(t.id)}
+                    style={{background:"transparent",border:"1px solid #ef444433",borderRadius:"6px",
+                      color:"#ef4444",fontSize:"10px",padding:"4px 9px",cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>🗑</button>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"14px",flexShrink:0}}>
+              <span style={{fontSize:"15px",fontWeight:"900",color:"#fbbf24"}}>{form?.id?"تعديل مصطلح":"مصطلح جديد"}</span>
+              <button onClick={()=>{setEditing(false);setForm(null);}}
+                style={{padding:"4px 10px",background:"transparent",border:"1px solid #1a2035",borderRadius:"6px",
+                  color:"#7a8599",fontSize:"11px",cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+            </div>
+            <div style={{overflowY:"auto",flex:1}}>
+              <div style={{marginBottom:"10px"}}>
+                <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"4px",fontWeight:"700"}}>اسم المصطلح</div>
+                <input value={form?.term||""} onChange={e=>setForm(p=>({...p,term:e.target.value}))}
+                  placeholder="مثال: الهالة"
+                  style={{width:"100%",background:"#080b14",border:"1px solid #1e2740",borderRadius:"7px",
+                    color:"#fbbf24",fontSize:"13px",fontWeight:"700",padding:"7px 10px",
+                    fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+              </div>
+              <div style={{marginBottom:"10px"}}>
+                <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"4px",fontWeight:"700"}}>التصنيف (اختياري)</div>
+                <input value={form?.category||""} onChange={e=>setForm(p=>({...p,category:e.target.value}))}
+                  placeholder="مثال: نظام الطاقة، الأعراق..."
+                  style={{width:"100%",background:"#080b14",border:"1px solid #1e2740",borderRadius:"7px",
+                    color:"#e2e8f0",fontSize:"12px",padding:"7px 10px",
+                    fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+              </div>
+              <div style={{marginBottom:"10px"}}>
+                <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"4px",fontWeight:"700"}}>أسماء بديلة (تُربط أيضاً بنفس التعريف)</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:"5px",marginBottom:"6px"}}>
+                  {(form?.aliases||[]).map(a=>(
+                    <span key={a} onClick={()=>removeAlias(a)}
+                      style={{background:"#fbbf2418",border:"1px solid #fbbf2444",color:"#fbbf24",
+                        fontSize:"10px",borderRadius:"5px",padding:"2px 8px",cursor:"pointer",fontFamily:"inherit"}}>
+                      {a} ×
+                    </span>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:"6px"}}>
+                  <input value={aliasInput} onChange={e=>setAliasInput(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addAlias();}}}
+                    placeholder="اسم بديل ثم Enter..."
+                    style={{flex:1,background:"#080b14",border:"1px solid #1e2740",borderRadius:"7px",
+                      color:"#e2e8f0",fontSize:"11px",padding:"6px 9px",fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+                  <button onClick={addAlias}
+                    style={{padding:"6px 12px",background:"#fbbf2422",border:"1px solid #fbbf2444",borderRadius:"7px",
+                      color:"#fbbf24",fontSize:"11px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"}}>+</button>
+                </div>
+              </div>
+              <div style={{marginBottom:"10px"}}>
+                <div style={{fontSize:"9px",color:"#5a6478",marginBottom:"4px",fontWeight:"700"}}>التعريف</div>
+                <textarea value={form?.definition||""} onChange={e=>setForm(p=>({...p,definition:e.target.value}))}
+                  rows={6} placeholder="اكتب تعريف المصطلح..."
+                  style={{width:"100%",background:"#080b14",border:"1px solid #1e2740",borderRadius:"8px",
+                    color:"#cbd5e1",fontSize:"12px",padding:"9px 11px",lineHeight:"1.8",resize:"none",
+                    fontFamily:"inherit",direction:"rtl",boxSizing:"border-box"}}/>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:"8px",marginTop:"8px",flexShrink:0}}>
+              <button onClick={doSave} disabled={saving||!form?.term?.trim()}
+                style={{flex:1,padding:"10px",background:saving?"#1e2535":"#052e16",
+                  border:"1px solid #16a34a",borderRadius:"9px",color:saving?"#5a6478":"#4ade80",
+                  fontSize:"13px",fontWeight:"700",cursor:saving?"default":"pointer",fontFamily:"inherit"}}>
+                {saving?"⏳ جاري الحفظ...":"💾 حفظ المصطلح"}
+              </button>
+              <button onClick={()=>{setEditing(false);setForm(null);}}
+                style={{padding:"10px 16px",background:"transparent",border:"1px solid #1e2740",
+                  borderRadius:"9px",color:"#7a8599",fontSize:"13px",cursor:"pointer",fontFamily:"inherit"}}>إلغاء</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══ تشغيل التطبيق ══ */
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<WikiApp/>);
+  </script>
+</body>
+</html>
