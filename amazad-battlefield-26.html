@@ -1,0 +1,4417 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>أرض المعركة — أمازاد</title>
+  <meta name="theme-color" content="#060810">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="أرض المعركة">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@300;400;600;700;900&display=swap');
+
+    :root {
+      --bg:       #060810;
+      --bg2:      #0a0e1a;
+      --bg3:      #0e1220;
+      --border:   #1a2035;
+      --border2:  #232840;
+      --accent:   #7c3aed;
+      --accent2:  #a855f7;
+      --red:      #ef4444;
+      --gold:     #f59e0b;
+      --blue:     #3b82f6;
+      --green:    #22c55e;
+      --text:     #e2e8f0;
+      --muted:    #6b7280;
+      --muted2:   #374151;
+      --grid-clr: rgba(200,30,30,0.55);
+      --grid-clr2:rgba(180,10,10,0.25);
+    }
+
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+    html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Cairo',sans-serif;direction:rtl;}
+    #app{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;}
+
+    /* ═══ HEADER ═══ */
+    .header{
+      display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 10px;
+      padding:8px 14px;background:var(--bg2);
+      border-bottom:1px solid var(--border);
+      min-height:52px;z-index:100;flex-shrink:0;
+    }
+    .header-title{font-size:15px;font-weight:900;color:var(--accent2);letter-spacing:.05em;}
+    .header-sub{font-size:10px;color:var(--muted);margin-top:1px;max-width:48vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .header-btn{
+      display:flex;align-items:center;gap:6px;padding:7px 14px;
+      background:var(--bg3);border:1px solid var(--border2);border-radius:10px;
+      color:var(--text);font-size:12px;font-weight:700;cursor:pointer;
+      font-family:'Cairo',sans-serif;white-space:nowrap;transition:border-color .2s,background .2s;
+    }
+    .header-btn:hover{border-color:var(--accent);background:#12172a;}
+    .header-btn.danger{border-color:#ef444455;color:#ef4444;}
+    .header-btn.danger:hover{border-color:#ef4444;background:#1a0808;}
+
+    /* ═══ TOOLBAR ═══ */
+    .toolbar{
+      display:flex;align-items:center;gap:8px;padding:8px 14px;
+      background:var(--bg2);border-bottom:1px solid var(--border);
+      overflow-x:auto;flex-shrink:0;
+    }
+    .toolbar::-webkit-scrollbar{height:0;}
+    .tool-btn{
+      display:flex;align-items:center;gap:5px;padding:6px 12px;
+      background:var(--bg3);border:1px solid var(--border2);border-radius:8px;
+      color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;
+      font-family:'Cairo',sans-serif;white-space:nowrap;transition:all .2s;flex-shrink:0;
+    }
+    .tool-btn:hover{border-color:var(--accent);color:var(--text);}
+    .tool-btn.active{border-color:var(--accent);color:var(--accent2);background:#12102a;}
+    .tool-divider{width:1px;height:24px;background:var(--border2);flex-shrink:0;}
+
+    /* ═══ BATTLEFIELD WRAPPER ═══ */
+    #bf-wrap{
+      flex:1;overflow:hidden;position:relative;background:var(--bg);
+      cursor:grab;
+      -webkit-user-select:none;user-select:none;
+    }
+    #bf-wrap.panning{cursor:grabbing;}
+
+    /* ═══ CANVAS AREA ═══ */
+    #bf-canvas{
+      position:absolute;top:0;left:0;
+      transform-origin:0 0;
+      will-change:transform;
+    }
+
+    /* MAP IMAGE + GRID OVERLAY */
+    #grid-svg{
+      position:absolute;top:0;left:0;
+      pointer-events:none;
+      overflow:visible;
+      z-index:5;
+      display:block;
+    }
+    #map-img{
+      position:absolute;top:0;left:0;
+      z-index:1;
+      display:block;
+      image-rendering:crisp-edges;
+    }
+    /* الشبكة الثابتة المستقلة — تعمل دائماً بمعزل عن الخريطة */
+    #grid-canvas-overlay{
+      position:absolute;top:0;left:0;
+      pointer-events:none;
+      z-index:6;
+      image-rendering:crisp-edges;
+    }
+
+    /* ═══ TOKENS ═══ */
+    /* الحاوية .token نقطة بلا حجم وبلا stacking context، فتشترك الأفاتار والبارات والأسماء في طبقة الخريطة نفسها:
+       الأفاتار 10 < البارات 11 < الأسماء 12 → الاسم فوق أي بار دائماً (حتى بارات الشخصيات الأخرى) */
+    .token{
+      position:absolute;width:0;height:0;
+      cursor:pointer;
+      -webkit-user-select:none;user-select:none;
+    }
+    .token:hover .token-avatar{filter:drop-shadow(0 0 8px var(--accent));}
+    .token.selected .token-avatar{filter:drop-shadow(0 0 10px #a855f7) drop-shadow(0 0 18px #7c3aed88);}
+
+    .token-avatar{
+      position:absolute;z-index:10;
+      border-radius:50%;border:2px solid #7c3aed;
+      object-fit:cover;background:#1a2035;
+      display:flex;align-items:center;justify-content:center;
+      font-size:18px;overflow:hidden;flex-shrink:0;
+      box-shadow:0 2px 12px #00000088;
+    }
+    .token-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+    .token-avatar.no-img{font-size:inherit;}
+
+    .token-bars{
+      position:absolute;left:0;z-index:11;width:max-content;
+      display:flex;flex-direction:column;gap:1px;
+      background:#00000099;border-radius:4px;padding:2px 4px;
+      backdrop-filter:blur(4px);
+    }
+    .token-bar-row{display:flex;align-items:center;gap:3px;font-size:9px;font-weight:700;font-family:'Cairo',sans-serif;}
+    /* البار بسماكة النص الرقمي المجاور له (كان 4px فيختفي)، والنسبة بنفس سماكة القيمة */
+    .token-bar-track{width:44px;height:9px;background:#1a2035;border-radius:3px;overflow:hidden;flex-shrink:0;}
+    .token-bar-fill{height:100%;border-radius:3px;transition:width .3s;}
+    .token-bar-val{font-size:8px;font-weight:800;white-space:nowrap;direction:ltr;}
+    .token-bar-pct{font-weight:800;opacity:1;}
+    #bf-canvas.bars-hidden .token-bars{display:none;}
+
+    .token-name{
+      position:absolute;left:0;z-index:12;width:max-content;
+      font-size:9px;font-weight:700;color:var(--text);
+      background:#00000099;border-radius:3px;padding:1px 5px;
+      white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;
+      text-align:center;backdrop-filter:blur(4px);
+    }
+
+    /* ═══ EMPTY STATE ═══ */
+    #empty-bf{
+      position:absolute;inset:0;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:16px;
+      pointer-events:none;
+    }
+    .empty-icon{font-size:64px;opacity:.15;}
+    .empty-text{font-size:13px;color:var(--muted);font-weight:600;text-align:center;opacity:.6;}
+
+    /* ═══ MODALS ═══ */
+    .modal-bg{
+      position:fixed;inset:0;background:#00000099;backdrop-filter:blur(4px);
+      display:flex;align-items:flex-end;justify-content:center;
+      z-index:1000;animation:fadeIn .2s ease;
+    }
+    .modal-bg.center{align-items:center;}
+    .modal{
+      background:var(--bg2);border:1px solid var(--border2);
+      border-radius:20px 20px 0 0;width:100%;max-width:480px;
+      max-height:90vh;overflow-y:auto;padding:20px 16px 32px;
+      animation:slideUp .25s cubic-bezier(.22,1,.36,1);
+    }
+    .modal.center{border-radius:16px;margin:16px;}
+    .modal::-webkit-scrollbar{width:0;}
+    .modal-title{font-size:16px;font-weight:900;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+    .modal-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 16px;display:block;}
+
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+    /* ═══ FORM ELEMENTS ═══ */
+    .form-label{font-size:11px;color:var(--muted);font-weight:700;margin-bottom:5px;letter-spacing:.05em;}
+    .form-group{margin-bottom:14px;}
+    .form-input{
+      width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;
+      color:var(--text);font-size:13px;padding:10px 12px;outline:none;
+      font-family:'Cairo',sans-serif;direction:rtl;transition:border-color .2s;
+    }
+    .form-input:focus{border-color:var(--accent);}
+    .form-row{display:flex;gap:8px;}
+    .form-row .form-group{flex:1;}
+
+    /* ═══ BUTTONS ═══ */
+    .btn{
+      padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;
+      cursor:pointer;font-family:'Cairo',sans-serif;border:none;transition:all .2s;
+    }
+    .btn-primary{background:var(--accent);color:#fff;}
+    .btn-primary:hover{background:#6d28d9;}
+    .btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--muted);}
+    .btn-ghost:hover{border-color:var(--border);color:var(--text);}
+    .btn-red{background:#ef444422;border:1px solid #ef444455;color:#ef4444;}
+    .btn-red:hover{background:#ef444433;}
+    .btn-row{display:flex;gap:8px;margin-top:16px;}
+
+    /* ═══ NPC PICKER ═══ */
+    .npc-pick-search{
+      width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;
+      color:var(--text);font-size:13px;padding:9px 12px;outline:none;margin-bottom:10px;
+      font-family:'Cairo',sans-serif;direction:rtl;transition:border-color .2s;
+    }
+    .npc-pick-search:focus{border-color:var(--accent);}
+    .npc-pick-empty{text-align:center;color:var(--muted);font-size:12px;padding:16px 0;}
+    .npc-pick-item{
+      display:flex;align-items:center;gap:10px;
+      padding:10px 12px;background:var(--bg3);border:1px solid var(--border);
+      border-radius:10px;margin-bottom:8px;cursor:pointer;transition:border-color .2s;
+    }
+    .npc-pick-item:hover{border-color:var(--accent);}
+    .npc-pick-avatar{
+      width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border2);
+      background:var(--bg2);display:flex;align-items:center;justify-content:center;
+      font-size:16px;overflow:hidden;flex-shrink:0;
+    }
+    .npc-pick-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+    .npc-pick-info{}
+    .npc-pick-name{font-size:13px;font-weight:700;color:var(--text);}
+    .npc-pick-sub{font-size:10px;color:var(--muted);}
+
+    /* ═══ BATTLE POPUP (multi, draggable) ═══ */
+    .battle-popup{
+      position:fixed;z-index:500;
+      background:var(--bg2);border:1px solid var(--border2);border-radius:16px;
+      padding:14px;width:270px;min-width:180px;max-width:420px;
+      box-shadow:0 8px 32px #000000cc;
+      animation:fadeIn .15s ease;
+      touch-action:none;
+      display:flex;flex-direction:column;
+      max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);
+      overflow:hidden;
+    }
+    /* جسم النافذة: يتمرّر داخلياً بينما يبقى شريط السحب والإغلاق ثابتين */
+    .bp-body{
+      flex:1 1 auto;min-height:0;
+      overflow-y:auto;overflow-x:hidden;
+      touch-action:pan-y;overscroll-behavior:contain;
+      -webkit-overflow-scrolling:touch;
+    }
+    .bp-body::-webkit-scrollbar{width:4px;}
+    /* شريط التحجيم الأفقي — في أسفل النافذة */
+    .bp-resize-bar{
+      position:absolute;top:0;left:0;right:0;
+      height:10px;cursor:ew-resize;
+      display:flex;align-items:center;justify-content:center;
+      background:transparent;
+      border-radius:16px 16px 0 0;
+      z-index:10;
+    }
+    .bp-resize-bar::after{
+      content:'';width:40px;height:3px;
+      background:var(--border2);border-radius:2px;
+      opacity:0.6;transition:opacity 0.2s;
+    }
+    .bp-resize-bar:hover::after{ opacity:1; background:var(--accent); }
+    /* مؤشر العرض الحالي */
+    .bp-size-badge{
+      position:absolute;bottom:14px;left:14px;
+      font-size:8px;color:var(--muted2);opacity:0;
+      transition:opacity 0.3s;pointer-events:none;
+    }
+    .battle-popup:hover .bp-size-badge{ opacity:1; }
+    .bp-drag-bar{
+      flex-shrink:0;
+      cursor:grab;height:22px;display:flex;align-items:center;justify-content:center;
+      margin:-4px -4px 8px;border-radius:12px 12px 0 0;background:#ffffff08;
+    }
+    .bp-drag-bar:active{cursor:grabbing;}
+    .bp-drag-handle{width:34px;height:4px;background:var(--border2);border-radius:2px;}
+    .bp-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+    .bp-avatar{
+      width:44px;height:44px;border-radius:50%;border:2px solid var(--accent);
+      overflow:hidden;background:var(--bg3);display:flex;align-items:center;justify-content:center;
+      font-size:20px;flex-shrink:0;
+    }
+    .bp-avatar img{width:100%;height:100%;object-fit:cover;}
+    .bp-name{font-size:14px;font-weight:900;color:var(--text);}
+    .bp-sub{font-size:10px;color:var(--muted);}
+    .bp-stat-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+    .bp-stat-label{font-size:10px;color:var(--muted);width:40px;font-weight:700;}
+    .bp-bar-wrap{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;cursor:pointer;}
+    .bp-bar{height:100%;border-radius:4px;transition:width .3s;}
+    .bp-val{font-size:11px;color:var(--text);font-weight:700;min-width:92px;text-align:left;white-space:nowrap;direction:ltr;}
+    .bp-pct{font-size:9px;color:var(--muted);font-weight:700;margin-left:3px;}
+    .bp-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+    .bp-action-btn{
+      padding:5px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;
+      color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;
+      font-family:'Cairo',sans-serif;transition:all .15s;
+    }
+    .bp-action-btn:hover{border-color:var(--accent);color:var(--accent2);}
+    .bp-close{
+      position:absolute;top:10px;left:10px;background:transparent;border:none;
+      color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;
+    }
+    .bp-close:hover{color:var(--red);}
+
+    /* Techniques panel inside popup */
+    .bp-tech-list{
+      max-height:140px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;
+      margin-top:6px;
+    }
+    .bp-tech-item{
+      background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+      padding:7px 10px;cursor:pointer;transition:border-color .15s;
+    }
+    .bp-tech-item:hover{border-color:var(--accent);}
+    .bp-tech-name{font-size:11px;font-weight:700;color:var(--text);}
+    .bp-tech-sub{font-size:9px;color:var(--muted);margin-top:2px;}
+    .bp-tech-desc{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5;display:none;}
+    .bp-tech-item.open .bp-tech-desc{display:block;}
+
+    /* profile link btn */
+    .bp-profile-link{
+      display:flex;align-items:center;justify-content:center;gap:6px;
+      width:100%;padding:7px;background:transparent;
+      border:1px solid var(--border2);border-radius:8px;
+      color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;
+      font-family:'Cairo',sans-serif;margin-top:8px;transition:all .15s;
+      text-decoration:none;
+    }
+    .bp-profile-link:hover{border-color:var(--accent2);color:var(--accent2);background:var(--accent2)11;}
+
+    /* ═══ MAP SETUP ═══ */
+    .map-upload-zone{
+      border:2px dashed var(--border2);border-radius:12px;padding:24px;
+      text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:14px;
+      background:var(--bg3);
+    }
+    .map-upload-zone:hover,.map-upload-zone.drag{border-color:var(--accent);}
+    .map-upload-zone-icon{font-size:32px;margin-bottom:8px;}
+    .map-upload-zone-text{font-size:12px;color:var(--muted);}
+
+    /* ═══ GRID SIZE CONTROLS ═══ */
+    .grid-control{
+      display:flex;align-items:center;gap:8px;background:var(--bg3);
+      border:1px solid var(--border2);border-radius:10px;padding:8px 12px;
+      margin-bottom:10px;
+    }
+    .grid-control label{font-size:11px;color:var(--muted);font-weight:700;flex:1;}
+    .grid-control input[type=range]{
+      flex:2;-webkit-appearance:none;height:4px;border-radius:2px;
+      background:var(--border2);outline:none;cursor:pointer;
+    }
+    .grid-control input[type=range]::-webkit-slider-thumb{
+      -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+      background:var(--accent);cursor:pointer;
+    }
+    .grid-control .val{font-size:12px;color:var(--text);font-weight:700;min-width:40px;text-align:center;}
+
+    /* ═══ STAT EDIT POPUP ═══ */
+    .se-row{
+      display:flex;align-items:center;gap:8px;margin-bottom:8px;
+    }
+    .se-label{font-size:11px;color:var(--muted);width:55px;font-weight:700;}
+    .se-input-wrap{display:flex;align-items:center;gap:4px;flex:1;}
+    .se-btn{
+      width:28px;height:28px;background:var(--bg3);border:1px solid var(--border2);
+      border-radius:6px;color:var(--text);font-size:14px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;
+    }
+    .se-btn:hover{border-color:var(--accent);}
+    .se-val{
+      flex:1;text-align:center;font-size:13px;font-weight:700;color:var(--text);
+      background:var(--bg3);border:1px solid var(--border2);border-radius:6px;
+      padding:4px 0;
+    }
+    .se-max{font-size:10px;color:var(--muted);}
+
+    /* ═══ ZOOM CONTROLS ═══ */
+    .zoom-controls{
+      position:absolute;top:12px;left:14px;
+      display:flex;flex-direction:column;gap:6px;z-index:50;
+    }
+    .zoom-btn{
+      width:36px;height:36px;background:var(--bg2);border:1px solid var(--border2);
+      border-radius:9px;color:var(--text);font-size:16px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;font-weight:700;
+      backdrop-filter:blur(8px);transition:border-color .15s;
+    }
+    .zoom-btn:hover{border-color:var(--accent);}
+    /* خيارات إحصائيات الشخصيات */
+    .bars-panel{
+      /* ثابتة ومتوسطة الشاشة كي لا تخرج عن الحواف مهما كان موضع زر الإحصائيات */
+      position:absolute;top:56px;left:14px;z-index:9000;
+      min-width:170px;max-width:calc(100% - 28px);box-sizing:border-box;
+      background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:8px 10px;
+      display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(8px);box-shadow:0 4px 18px #0009;
+    }
+    .bars-panel[hidden]{display:none;}
+    .bars-panel-title{font-size:10px;font-weight:800;color:var(--muted);}
+    .bars-panel-row{display:flex;align-items:center;gap:6px;}
+    .bars-panel-row button,.bars-panel-toggle{
+      background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text);
+      font-family:'Cairo',sans-serif;font-weight:800;cursor:pointer;
+    }
+    .bars-panel-row button{width:28px;height:28px;font-size:14px;}
+    .bars-panel-row .bars-scale-val{flex:1;text-align:center;font-size:12px;font-weight:800;color:var(--text);direction:ltr;}
+    .bars-panel-toggle{padding:6px 8px;font-size:11px;}
+    .bars-panel-toggle.on{border-color:#ef4444;color:#ff8080;background:#ef444418;}
+    .bars-panel.disabled .bars-panel-row{opacity:.4;pointer-events:none;}
+
+    /* ═══ IMAGE UPLOAD IN PROFILE ═══ */
+    .img-upload-circle{
+      width:80px;height:80px;border-radius:50%;border:2px dashed var(--border2);
+      background:var(--bg3);display:flex;align-items:center;justify-content:center;
+      cursor:pointer;margin:0 auto 12px;overflow:hidden;transition:border-color .2s;
+      font-size:28px;
+    }
+    .img-upload-circle:hover{border-color:var(--accent);}
+    .img-upload-circle img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+
+    /* ═══ TOAST ═══ */
+    .toast{
+      position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+      background:#1a2035;border:1px solid var(--border2);border-radius:10px;
+      padding:8px 18px;font-size:12px;color:var(--text);font-weight:700;
+      z-index:2000;animation:fadeIn .2s ease;
+      backdrop-filter:blur(8px);white-space:nowrap;
+    }
+
+    /* ═══ COORD DISPLAY ═══ */
+    .coord-display{
+      position:absolute;bottom:20px;right:14px;
+      background:#00000088;border:1px solid var(--border2);border-radius:8px;
+      padding:4px 10px;font-size:10px;color:var(--muted);
+      backdrop-filter:blur(8px);z-index:50;font-family:monospace;
+    }
+
+    /* ═══ SCROLLBAR ═══ */
+    ::-webkit-scrollbar{width:4px;}
+    ::-webkit-scrollbar-track{background:var(--bg2);}
+    ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+    /* ═══ SECTION DIVIDER ═══ */
+    .sec-div{height:1px;background:var(--border);margin:12px 0;}
+
+    /* ═══ IMAGE CROP OVERLAY ═══ */
+    .crop-modal-inner{display:flex;flex-direction:column;align-items:center;gap:12px;}
+    .crop-canvas-wrap{
+      position:relative;width:220px;height:220px;border-radius:50%;overflow:hidden;
+      border:2px solid var(--accent);cursor:move;flex-shrink:0;background:#000;
+    }
+    .crop-img{position:absolute;transform-origin:center center;}
+    .crop-controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+
+    /* ═══ ATTACK RANGE OVERLAY ═══ */
+    .atk-range-circle{
+      position:absolute;
+      border-radius:50%;
+      pointer-events:none;
+      z-index:8;
+      transform:translate(-50%,-50%);
+      border:2px dashed rgba(255,80,80,0.85);
+      background:rgba(255,30,30,0.08);
+      box-shadow:0 0 12px rgba(255,50,50,0.4), inset 0 0 12px rgba(255,50,50,0.08);
+      animation:atkPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes atkPulse{
+      0%,100%{box-shadow:0 0 12px rgba(255,50,50,0.4),inset 0 0 12px rgba(255,50,50,0.08);}
+      50%{box-shadow:0 0 24px rgba(255,80,80,0.7),inset 0 0 20px rgba(255,50,50,0.15);}
+    }
+    .atk-range-label{
+      position:absolute;
+      transform:translate(-50%,-50%);
+      background:rgba(20,5,5,0.88);border:1px solid rgba(255,80,80,0.6);
+      border-radius:6px;padding:2px 8px;font-size:9px;font-weight:700;
+      color:#ff8080;z-index:9;pointer-events:none;white-space:nowrap;
+    }
+    .atk-target-indicator{
+      position:absolute;pointer-events:none;z-index:11;
+      transform:translate(-50%,-50%);
+      width:20px;height:20px;border-radius:50%;
+      border:2.5px solid #ff4444;
+      animation:targetBlink .5s ease-in-out infinite alternate;
+    }
+    @keyframes targetBlink{from{opacity:1;transform:translate(-50%,-50%) scale(1);}to{opacity:.5;transform:translate(-50%,-50%) scale(1.18);}}
+
+    /* ═══ DAMAGE CALCULATOR POPUP ═══ */
+    .dmg-popup{
+      position:fixed;z-index:600;
+      background:var(--bg2);border:1px solid #ef444455;border-radius:16px;
+      padding:14px;width:310px;
+      box-shadow:0 8px 32px #000000cc, 0 0 0 1px #ef444422;
+      animation:fadeIn .15s ease;
+      font-family:'Cairo',sans-serif;
+      direction:rtl;
+      display:flex;flex-direction:column;
+      max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);
+      overflow:hidden;
+    }
+    .dmg-drag-bar{
+      flex-shrink:0;
+      cursor:grab;height:20px;display:flex;align-items:center;justify-content:center;
+      margin:-4px -4px 10px;border-radius:12px 12px 0 0;background:#ef444411;
+    }
+    .dmg-drag-handle{width:34px;height:4px;background:#ef444444;border-radius:2px;}
+    .dmg-section{margin-bottom:10px;}
+    .dmg-section-title{font-size:10px;font-weight:900;color:#ef4444;margin-bottom:6px;
+      letter-spacing:.05em;text-transform:uppercase;}
+    .dmg-input-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+    .dmg-label{font-size:10px;color:var(--muted);width:90px;flex-shrink:0;text-align:right;}
+    .dmg-input{
+      flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;
+      color:var(--text);font-size:12px;padding:5px 8px;font-family:'Cairo',sans-serif;
+      outline:none;direction:ltr;text-align:center;
+    }
+    .dmg-input:focus{border-color:#ef4444;}
+    .dmg-checkbox-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;cursor:pointer;}
+    .dmg-checkbox-row input{accent-color:#ef4444;width:14px;height:14px;}
+    .dmg-checkbox-row span{font-size:11px;color:var(--muted);}
+    .target-chip{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:3px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;
+      font-size:10px;font-weight:700;cursor:pointer;margin:2px;
+      transition:border-color .15s,background .15s;
+    }
+    .target-chip{color:#fff;}   /* الاسم أبيض: كان يرث الأسود فلا يُرى على الخلفية الداكنة */
+    .target-chip.selected{border-color:#ef4444;background:#ef444422;color:#fff;}
+    .target-chip .chip-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+    .dmg-result-item{
+      background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+      padding:8px 10px;margin-bottom:6px;
+    }
+    .dmg-result-name{font-size:11px;font-weight:700;margin-bottom:4px;}
+    .dmg-result-row{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:2px;}
+    .dmg-result-final{font-size:14px;font-weight:900;margin-top:4px;}
+    .dmg-result-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:4px;}
+    .dmg-result-bar-fill{height:100%;background:#ef4444;border-radius:3px;transition:width .4s;}
+    .atk-type-btn{
+      flex:1;padding:5px 6px;background:var(--bg3);border:1px solid var(--border2);
+      border-radius:7px;font-size:10px;font-weight:700;cursor:pointer;
+      font-family:'Cairo',sans-serif;color:var(--muted);transition:all .15s;text-align:center;
+    }
+    .atk-type-btn.active{border-color:#ef4444;color:#ff8080;background:#ef444418;}
+
+    /* ═══ المبادرة وترتيب الأدوار ═══ */
+    .combat-panel{position:fixed;left:0;right:0;bottom:0;z-index:150;max-height:64vh;max-height:64dvh;overflow-y:auto;
+      background:var(--bg2);border-top:2px solid #22c55e66;padding:8px 10px 14px;direction:rtl;box-shadow:0 -6px 24px #000a;
+      -webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+    .combat-panel[hidden]{display:none;}
+    .token.turn-active .token-avatar{box-shadow:0 0 0 3px #22c55e,0 0 18px 4px #22c55e99;}
+    .cb-sec{margin:8px 0;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;}
+    .cb-title{font-size:11px;font-weight:900;color:var(--text);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:6px;}
+    .cb-sub{font-size:9px;color:var(--muted);font-weight:700;}
+    .cb-btns{display:flex;flex-wrap:wrap;gap:5px;}
+    .cb-btn{padding:5px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);
+      font-size:10px;font-weight:800;font-family:'Cairo',sans-serif;cursor:pointer;}
+    .cb-btn.red{border-color:#ef4444;color:#ff8080;background:#ef444418;}
+    .cb-btn.green{border-color:#22c55e;color:#4ade80;background:#22c55e18;}
+    .cb-btn.gold{border-color:#f59e0b;color:#fbbf24;background:#f59e0b18;}
+    .cb-btn.sm{padding:2px 7px;font-size:9px;}
+    .cb-sel,.cb-num{background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);
+      font-family:'Cairo',sans-serif;font-size:10px;padding:3px 5px;}
+    .cb-num{width:52px;text-align:center;direction:ltr;}
+    .cb-turn{display:flex;align-items:center;gap:6px;padding:5px 7px;border:1px solid var(--border);border-radius:8px;
+      margin-bottom:4px;background:var(--bg2);font-size:11px;}
+    .cb-turn.current{border-color:#22c55e;background:#22c55e18;box-shadow:0 0 0 1px #22c55e66;}
+    .cb-turn.played{opacity:.45;}
+    .cb-turn .nm{flex:1;font-weight:800;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .cb-turn .val{font-weight:900;color:#fbbf24;min-width:30px;text-align:center;direction:ltr;}
+    .cb-badge{font-size:8px;font-weight:800;padding:1px 5px;border-radius:9px;background:var(--bg3);color:var(--muted);border:1px solid var(--border2);white-space:nowrap;}
+    .cb-badge.extra{color:#38bdf8;border-color:#38bdf855;}
+    .cb-badge.nat{color:#fbbf24;border-color:#fbbf2466;}
+    .cb-badge.bad{color:#f87171;border-color:#f8717166;}
+    .cb-badge.int{color:#c084fc;border-color:#c084fc66;}
+    .cb-part{padding:7px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--bg2);}
+    .cb-part-head{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+    .cb-part-head .nm{flex:1;font-weight:900;color:#fff;font-size:11px;}
+    .cb-row{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:4px;font-size:9px;color:var(--muted);}
+    .cb-chip{padding:2px 7px;border:1px solid var(--border2);border-radius:12px;font-size:9px;font-weight:700;color:var(--muted);cursor:pointer;background:var(--bg3);}
+    .cb-chip.on{border-color:#22c55e;color:#4ade80;background:#22c55e18;}
+    .cb-log{font-size:9px;color:var(--muted);line-height:1.7;max-height:70px;overflow-y:auto;}
+    .chance-box{display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--bg3);border-radius:8px;margin-bottom:4px;}
+    .chance-box .lb{flex:1;font-size:10px;font-weight:800;color:var(--text);}
+    .chance-box .ct{min-width:42px;text-align:center;font-size:13px;font-weight:900;direction:ltr;}
+    .chance-box button{width:24px;height:24px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-weight:900;cursor:pointer;}
+
+    /* ═══ SESSIONS ═══ */
+    .sess-item{
+      display:flex;align-items:center;gap:8px;padding:10px 12px;
+      background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;
+    }
+    .sess-item.active{border-color:var(--accent);background:#12102a;}
+    .sess-main{flex:1;min-width:0;cursor:pointer;}
+    .sess-name{font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .sess-item.active .sess-name{color:var(--accent2);}
+    .sess-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+    .sess-actions{display:flex;gap:4px;flex-shrink:0;}
+    .sess-actions button{
+      width:28px;height:28px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;
+      color:var(--muted);font-size:12px;cursor:pointer;
+    }
+    .sess-actions button:hover{border-color:var(--accent);color:var(--text);}
+    .sess-actions button.danger:hover{border-color:#ef4444;color:#ef4444;}
+
+    /* ═══ CONNECTED CHARS LIST ═══ */
+    .connected-token{
+      display:flex;align-items:center;gap:8px;padding:8px 10px;
+      background:var(--bg3);border:1px solid var(--border);border-radius:9px;margin-bottom:6px;
+    }
+    .connected-token-avatar{
+      width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border2);
+      overflow:hidden;background:var(--bg2);flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;font-size:13px;
+    }
+    .connected-token-avatar img{width:100%;height:100%;object-fit:cover;}
+    .connected-token-name{flex:1;font-size:12px;font-weight:700;color:var(--text);}
+    .connected-token-pos{font-size:10px;color:var(--muted);font-family:monospace;}
+    .remove-token-btn{
+      background:transparent;border:1px solid #ef444433;border-radius:6px;
+      color:#ef444488;font-size:11px;padding:2px 6px;cursor:pointer;
+    }
+    .remove-token-btn:hover{border-color:#ef4444;color:#ef4444;}
+    @media (max-width:480px){
+      .header-btn{padding:6px 9px;font-size:11px;gap:4px;}
+    }
+  </style>
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="header-title">⚔ أرض المعركة</div>
+      <div class="header-sub" id="header-sub">لا توجد خريطة محملة</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+      <button class="header-btn" onclick="clearAttackRanges()" title="مسح نطاق الضرر" style="color:#ef4444;">🚫</button>
+      <button class="header-btn" onclick="toggleCombatPanel()" style="color:#4ade80;">⚔ مبادرة</button>
+      <button class="header-btn" onclick="openSessionsModal()">📁 جلسات</button>
+      <button class="header-btn" onclick="openMapSetup()">🗺 خريطة</button>
+      <button class="header-btn" onclick="openNpcPicker()">👤 شخصية</button>
+      <button class="header-btn danger" onclick="clearBattlefield()" title="مسح الخريطة والشخصيات">🗑</button>
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <button class="tool-btn active" id="tool-move" onclick="setTool('move')">✋ تحريك الخريطة</button>
+    <div class="tool-divider"></div>
+    <button class="tool-btn" id="tool-select" onclick="setTool('select')">🎯 تحديد</button>
+    <div class="tool-divider"></div>
+    <button class="tool-btn" id="tool-attack" onclick="openAttackLauncher()">⚔ هجمة</button>
+    <div class="tool-divider"></div>
+    <span style="font-size:10px;color:var(--muted);white-space:nowrap;">الشبكة:</span>
+    <button class="tool-btn" id="grid-toggle" onclick="toggleGrid()">▦ إخفاء</button>
+    <div class="tool-divider"></div>
+    <span style="font-size:10px;color:var(--muted);white-space:nowrap;" id="token-count-display">لا توجد شخصيات</span>
+  </div>
+
+  <!-- BATTLEFIELD WRAP -->
+  <div id="bf-wrap">
+    <div id="bf-canvas">
+      <img id="map-img" style="display:none;" draggable="false">
+      <svg id="grid-svg" width="0" height="0" style="display:none;"></svg>
+      <canvas id="grid-canvas-overlay"></canvas>
+      <!-- tokens injected here -->
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-bf">
+      <div class="empty-icon">🗡️</div>
+      <div class="empty-text">اضغط على «خريطة» لتحميل خريطة المعركة<br>ثم أضف شخصياتك إليها</div>
+      <button onclick="quickWhiteMap()" style="padding:8px 20px;background:#f8fafc11;border:1px solid #e2e8f033;border-radius:10px;color:#e2e8f0;font-size:12px;font-weight:700;cursor:pointer;font-family:'Cairo',sans-serif;pointer-events:auto;margin-top:12px;">
+        ⬜ خريطة بيضاء سريعة (20×20)
+      </button>
+    </div>
+
+    <!-- Zoom controls -->
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="bars-opt-btn" title="خيارات إحصائيات الشخصيات (حجم / إزالة)" onclick="toggleBarsPanel()">📊</button>
+    </div>
+    <div class="bars-panel" id="bars-panel" hidden>
+      <div class="bars-panel-title">إحصائيات تحت الشخصيات</div>
+      <div class="bars-panel-row">
+        <button title="تصغير" onclick="changeBarScale(-0.1)">−</button>
+        <span class="bars-scale-val" id="bars-scale-val">100%</span>
+        <button title="تكبير" onclick="changeBarScale(0.1)">+</button>
+        <button title="الحجم الأصلي" onclick="resetBarScale()">↺</button>
+      </div>
+      <button class="bars-panel-toggle" id="bars-hide-btn" onclick="toggleBarsHidden()">🙈 إزالة الإحصائيات</button>
+    </div>
+
+    <!-- Coord display -->
+    <div class="coord-display" id="coord-display">—</div>
+  </div>
+
+</div>
+
+<!-- BATTLE POPUPS CONTAINER (multiple draggable) -->
+<div id="battle-popups-layer"></div>
+<!-- DAMAGE CALC POPUPS -->
+<div id="dmg-popups-layer"></div>
+
+<!-- TOAST -->
+<div id="toast" class="toast" style="display:none;"></div>
+
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   AMAZAD BATTLEFIELD v2.0
+   Companion to amazad.html — reads savedProfiles + images
+══════════════════════════════════════════════════════════ */
+
+/* ═══ SUPABASE CONFIG ═══ */
+const SUPABASE_URL = "https://ewcsadahyyekvutgdnup.supabase.co";
+const SUPABASE_KEY = "sb_publishable_NHfl_osWeI-b_YKd1L_rpA_inHCksfO";
+const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ═══ STORAGE KEYS ═══ */
+const IMG_KEY_PREFIX    = "amazad_img_";
+const BF_KEY            = "amazad_bf_v2";
+// المفتاح الحقيقي الذي يستعمله مولّد أمازاد لحفظ الشخصيات "محلياً فقط"
+const LOCAL_ONLY_KEY     = "amazad_local_profiles";
+
+/* تحويل صف Supabase → كائن NPC داخلي */
+const rowToNpc = (row) => ({
+  saveId:       row.id,
+  name:         row.name,
+  title:        row.title,
+  race:         row.race,
+  level:        row.level,
+  lifeGrade:    row.life_grade,
+  hp:           row.hp,
+  hpMax:        row.hp_max,
+  hala:         row.hala,
+  halaMax:      row.hala_max,
+  stamina:      row.stamina,
+  staminaMax:   row.stamina_max,
+  defense:      row.defense      ?? 0,   // دفاع عادي (flat)
+  dmgReduce:    row.dmg_reduce   ?? 0,   // تقليل الضرر المئوي
+  trueDefense:  row.true_defense ?? 0,   // دفاع حقيقي
+  trueDef:      row.true_defense ?? 0,   // نفسه — للتوافق
+  physStrPct:   row.phys_str_pct ?? 0,   // معادلة القوة
+  immunity:     row.immunity     ?? 0,
+  charSize:     row.char_size    ?? 170,
+  size:         row.char_size    ?? 170,
+  background:   row.background,
+  emoji:        row.emoji,
+  raceColor:    row.race_color,
+  worthiness:   row.worthiness,
+  mentalHealth: row.mental_health,
+  mentalHealthMax: row.mental_health_max,
+  stats:        row.stats        || [],
+  skills:       row.skills       || [],
+  inventory:    row.inventory    || [],
+  notes:        row.notes        || "",
+  _transforms:  row.transformations || [],
+  abilities:    (() => { const a = {...(row.abilities||{})}; delete a._description; return a; })(),
+  description:  (row.abilities && row.abilities._description) || "",
+  continent:    row.continent,
+  languages:    row.languages    || [],
+  classes:      row.classes      || [],
+  raceTraits:   row.race_traits  || [],
+  weapons:      row.weapons      || [],
+  customFields: row.custom_fields|| [],
+  mbti:         row.mbti,
+  moral:        row.moral,
+  animalType:   row.animal_type,
+  eyeType:      row.eye_type,
+  dragonParts:  row.dragon_parts || [],
+  dragonDegree: row.dragon_degree,
+  souls:        row.souls,
+  soulType:     row.soul_type,
+  coreQuality:  row.core_quality,
+  savedAt:      row.created_at ? new Date(row.created_at).toLocaleString("ar-SA") : "",
+});
+
+/* ═══ قائمة الشخصيات (cache) — يُملأ عند init ═══ */
+let _cachedProfiles = null;
+
+async function fetchAmazadProfiles(){
+  // 1. جلب الشخصيات المحلية أولاً (ما حُفظ على الجهاز)
+  //    أ) الشخصيات "محلية فقط" التي حفظها المستخدم من مولّد أمازاد (amazad_local_profiles)
+  //    ب) كاش/نسخة احتياطية قديمة (amazad_profiles أو amazad_v1) — للتوافق مع نسخ سابقة
+  let localOnlyProfiles = [];
+  try{
+    const raw = localStorage.getItem(LOCAL_ONLY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    localOnlyProfiles = Array.isArray(parsed) ? parsed : (parsed.profiles || []);
+  }catch(e){}
+
+  let legacyProfiles = [];
+  try{
+    const raw = localStorage.getItem("amazad_profiles") || localStorage.getItem("amazad_v1");
+    const parsed = raw ? JSON.parse(raw) : [];
+    legacyProfiles = Array.isArray(parsed) ? parsed : (parsed.profiles || []);
+  }catch(e){}
+
+  // دمج المحليّين: الأولوية لـ amazad_local_profiles لأنه المصدر الفعلي والأحدث
+  const localIds = new Set(localOnlyProfiles.map(p=>String(p.saveId||p.id)));
+  const localProfiles = [...localOnlyProfiles, ...legacyProfiles.filter(p=>!localIds.has(String(p.saveId||p.id)))];
+
+  // 2. جلب الشخصيات العامة من Supabase
+  let remoteProfiles = [];
+  try{
+    const { data, error } = await _sb
+      .from("characters")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if(error) throw error;
+    remoteProfiles = data.map(row => {
+      const npc = rowToNpc(row);
+      if(row.image_url){
+        try{ localStorage.setItem('amazad_img_' + row.id, row.image_url); }catch(e){}
+      }
+      return npc;
+    });
+  }catch(e){
+    console.warn("Supabase fetch failed:", e.message);
+  }
+
+  // 3. دمج: الشخصيات المحلية التي لا توجد في Supabase تُضاف
+  const remoteIds = new Set(remoteProfiles.map(p=>String(p.saveId||p.id)));
+  const localOnly = localProfiles.filter(p=>!remoteIds.has(String(p.saveId||p.id)));
+
+  _cachedProfiles = [...remoteProfiles, ...localOnly];
+
+  // حفظ محلي كـ fallback
+  try{ localStorage.setItem("amazad_profiles", JSON.stringify(_cachedProfiles)); }catch(e){}
+  return _cachedProfiles;
+}
+
+
+/* ═══ STATE ═══ */
+let state = {
+  mapSrc:    null,
+  mapW:      0,
+  mapH:      0,
+  mapNatW:   0,
+  mapNatH:   0,
+  gridCols:  20,
+  gridRows:  20,
+  cellPx:    60,
+  gridVis:   true,
+  gridColor: 'rgba(200,30,30,0.65)',
+  gridBorderColor: 'rgba(255,30,30,0.95)',
+  panSensitivity: 1.0,   // معامل حساسية التحريك
+  tokens:    [],
+  pan: {x:0, y:0},
+  zoom:      1.0,
+  tool:      'move',
+};
+
+let selectedTokenId = null;
+// Map of open popups: tokId -> { el, offsetX, offsetY }
+const openPopups = {};
+
+/* ═══ PAN / ZOOM ═══ */
+let isPanning   = false;
+let panStart    = {x:0,y:0};
+let panOrigin   = {x:0,y:0};
+
+/* ═══ ELEMENTS ═══ */
+const bfWrap    = document.getElementById('bf-wrap');
+const bfCanvas  = document.getElementById('bf-canvas');
+const mapImg    = document.getElementById('map-img');
+const popup     = document.getElementById('battle-popup');
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+async function init(){
+  loadUiPrefs();
+  await initSessions();
+  renderAll();
+  applyBarPrefs();
+  setupPanZoom();
+  fetchAmazadProfiles().then(()=>{ renderAll(); });
+}
+
+/* ═══════════════════════════════════════
+   SESSIONS + PERSISTENCE
+   كل جلسة = خريطة + شخصيات + إعدادات الشبكة، وتُحفظ منفصلة عن غيرها.
+   التخزين في IndexedDB لأن الخرائط صور كبيرة لا تتسع في localStorage،
+   مع رجوع تلقائي إلى localStorage إن لم يتوفر IndexedDB.
+═══════════════════════════════════════ */
+const SESS_INDEX_KEY  = 'amazad_bf_sessions_index_v1';
+const SESS_ACTIVE_KEY = 'amazad_bf_active_session_v1';
+const SESS_LS_PREFIX  = 'amazad_bf_sess_';
+const IDB_NAME  = 'amazad_battlefield';
+const IDB_STORE = 'sessions';
+
+let sessions = [];            // [{id,name,createdAt,updatedAt,cols,rows,tokens,hasMap}]
+let activeSessionId = null;
+let _idbPromise = null;
+
+/* ══ قاعدة الأرقام العشرية ══
+   خانة عشرية واحدة كحد أقصى، بالقطع لا بالتقريب (5÷3 ← 1.6 وليس 1.7)، وبلا أصفار زائدة (2.0 ← 2).
+   trunc1 ترجع رقماً (للحساب والتخزين)، وfmt1 ترجع نصاً (للعرض).
+   استثناء: قيمة Y في التقنيات تبقى بدقتها الكاملة (خانتان). */
+const trunc1 = (v) => {
+  const n = Number(v);
+  if(!isFinite(n)) return 0;
+  const r = n < 0 ? -Math.floor(-n*10 + 1e-7)/10 : Math.floor(n*10 + 1e-7)/10;
+  return r === 0 ? 0 : r;
+};
+const fmt1 = (v) => { const n = Number(v); return isFinite(n) ? String(trunc1(n)) : String(v); };
+
+const DEFAULT_STATE = () => ({
+  mapSrc:null, mapW:0, mapH:0, mapNatW:0, mapNatH:0,
+  gridCols:20, gridRows:20, cellPx:60, gridVis:true,
+  gridColor:'rgba(200,30,30,0.65)', gridBorderColor:'rgba(255,30,30,0.95)',
+  panSensitivity:1.0, tokens:[], pan:{x:0,y:0}, zoom:1.0, tool:'move',
+  combat:{cycle:0, parts:[], order:[], current:-1, log:[]},
+});
+
+function idbOpen(){
+  if(_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((res,rej)=>{
+    if(!window.indexedDB){ rej(new Error('IndexedDB unavailable')); return; }
+    const rq = indexedDB.open(IDB_NAME, 1);
+    rq.onupgradeneeded = ()=>{ rq.result.createObjectStore(IDB_STORE); };
+    rq.onsuccess = ()=>res(rq.result);
+    rq.onerror   = ()=>rej(rq.error);
+    rq.onblocked = ()=>rej(new Error('IndexedDB blocked'));
+  });
+  return _idbPromise;
+}
+async function idbPut(key, val){
+  const db = await idbOpen();
+  await new Promise((res,rej)=>{
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = ()=>res();
+    tx.onerror = tx.onabort = ()=>rej(tx.error || new Error('IndexedDB write failed'));
+  });
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{
+    const rq = db.transaction(IDB_STORE,'readonly').objectStore(IDB_STORE).get(key);
+    rq.onsuccess = ()=>res(rq.result);
+    rq.onerror   = ()=>rej(rq.error);
+  });
+}
+async function sessPut(id, data){
+  try{
+    await idbPut(id, data);
+  }catch(e){
+    // بديل: localStorage (يرمي خطأ إن امتلأت المساحة، فيظهر تنبيه الحفظ)
+    localStorage.setItem(SESS_LS_PREFIX+id, JSON.stringify(data));
+  }
+}
+async function sessGet(id){
+  try{
+    const v = await idbGet(id);
+    if(v) return v;
+  }catch(e){}
+  try{ const raw = localStorage.getItem(SESS_LS_PREFIX+id); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
+}
+async function sessDel(id){
+  try{
+    const db = await idbOpen();
+    await new Promise((res,rej)=>{
+      const tx = db.transaction(IDB_STORE,'readwrite');
+      tx.objectStore(IDB_STORE).delete(id);
+      tx.oncomplete = ()=>res();
+      tx.onerror = tx.onabort = ()=>rej(tx.error);
+    });
+  }catch(e){}
+  try{ localStorage.removeItem(SESS_LS_PREFIX+id); }catch(e){}
+}
+
+let _metaChain = Promise.resolve();
+function persistSessionIndex(){
+  try{ localStorage.setItem(SESS_INDEX_KEY, JSON.stringify(sessions)); }catch(e){}
+  try{ localStorage.setItem(SESS_ACTIVE_KEY, activeSessionId || ''); }catch(e){}
+  // نسخة احتياطية من الفهرس داخل IndexedDB (أثبت من localStorage): حتى لو ضاع الفهرس المحلي لا تُفقد الجلسات
+  const snap = {sessions:cloneJson(sessions), active:activeSessionId};
+  _metaChain = _metaChain.then(()=>idbPut('__index__', snap)).catch(()=>{});
+}
+function newSessionRecord(name){
+  return {
+    id: 's_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    name, createdAt: Date.now(), updatedAt: Date.now(),
+    cols:20, rows:20, tokens:0, hasMap:false,
+  };
+}
+function sessionMetaFrom(d){
+  return { cols:d?.gridCols||20, rows:d?.gridRows||20, tokens:(d?.tokens||[]).length, hasMap:!!d?.mapSrc };
+}
+function getActiveSession(){ return sessions.find(s=>s.id===activeSessionId) || null; }
+function nextSessionName(){
+  let n = sessions.length + 1;
+  while(sessions.some(s=>s.name==='الجلسة '+n)) n++;
+  return 'الجلسة '+n;
+}
+function cloneJson(v){
+  try{ return structuredClone(v); }catch(e){ return JSON.parse(JSON.stringify(v)); }
+}
+const _escS = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* لقطة من الحالة الحالية (تُنسخ فوراً حتى لا تتأثر بتغييرات لاحقة أو بتبديل الجلسة) */
+function snapshotState(){
+  return {
+    mapSrc:state.mapSrc, mapW:state.mapW, mapH:state.mapH, mapNatW:state.mapNatW, mapNatH:state.mapNatH,
+    gridCols:state.gridCols, gridRows:state.gridRows, cellPx:state.cellPx, gridVis:state.gridVis,
+    gridColor:state.gridColor, gridBorderColor:state.gridBorderColor,
+    tokens:cloneJson(state.tokens), pan:{...state.pan}, zoom:state.zoom,
+    combat:cloneJson(state.combat||{cycle:0,parts:[],order:[],current:-1,log:[]}),
+  };
+}
+
+/* الحفظ مؤجَّل 250ms لتجميع التغييرات المتلاحقة (تحريك/تكبير) ثم يُكتب على الجلسة النشطة */
+let _saveTimer = null, _savePending = false, _saveChain = Promise.resolve();
+function saveBfState(){
+  _savePending = true;
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(flushBfState, 250);
+}
+function flushBfState(){
+  clearTimeout(_saveTimer);
+  if(!_savePending || !activeSessionId) return _saveChain;
+  _savePending = false;
+  const id = activeSessionId;
+  const data = snapshotState();
+  _saveChain = _saveChain
+    .then(()=>sessPut(id, data))
+    .then(()=>{
+      const s = sessions.find(x=>x.id===id);
+      if(s){ Object.assign(s, sessionMetaFrom(data), {updatedAt:Date.now()}); persistSessionIndex(); }
+    })
+    .catch(e=>{ console.warn('save failed', e); showToast('⚠ فشل الحفظ: مساحة التخزين ممتلئة'); });
+  return _saveChain;
+}
+
+/* تطبيق بيانات جلسة على الحالة الحية */
+function loadSessionData(data){
+  const keepSens = state.panSensitivity, keepTool = state.tool;
+  Object.assign(state, DEFAULT_STATE(), data || {});
+  state.panSensitivity = keepSens || 1.0;   // تفضيل عام لا يخص الجلسة
+  state.tool = keepTool || 'move';
+  // تأكد أن الشبكة دائماً لها أبعاد
+  if(!state.mapW || !state.mapH){
+    state.mapW = state.gridCols * state.cellPx;
+    state.mapH = state.gridRows * state.cellPx;
+  }
+}
+
+async function initSessions(){
+  try{
+    const parsed = JSON.parse(localStorage.getItem(SESS_INDEX_KEY) || '[]');
+    sessions = Array.isArray(parsed) ? parsed : [];
+  }catch(e){ sessions = []; }
+  activeSessionId = localStorage.getItem(SESS_ACTIVE_KEY) || null;
+  // دمج نسخة الفهرس المحفوظة في IndexedDB (تعيد الجلسات الناقصة، والأحدث تفوز)
+  try{
+    const meta = await idbGet('__index__');
+    if(meta && Array.isArray(meta.sessions)){
+      const byId = new Map(sessions.map(s=>[s.id,s]));
+      meta.sessions.forEach(s=>{
+        const cur = byId.get(s.id);
+        if(!cur || (s.updatedAt||0) > (cur.updatedAt||0)) byId.set(s.id, s);
+      });
+      sessions = [...byId.values()];
+      if(!activeSessionId) activeSessionId = meta.active || null;
+    }
+  }catch(e){}
+
+  let legacy = null;
+  if(!sessions.length){
+    // ترحيل الحفظ القديم (خريطة واحدة) إلى الجلسة الأولى — المفتاح القديم يبقى كما هو دون مسح
+    try{ const raw = localStorage.getItem(BF_KEY); if(raw) legacy = JSON.parse(raw); }catch(e){}
+    const first = newSessionRecord('الجلسة 1');
+    if(legacy) Object.assign(first, sessionMetaFrom(legacy));
+    sessions = [first];
+    activeSessionId = first.id;
+    if(legacy){ try{ await sessPut(first.id, legacy); }catch(e){ console.warn('migration write failed', e); } }
+    persistSessionIndex();
+  }
+  if(!sessions.some(s=>s.id===activeSessionId)){
+    activeSessionId = sessions[0].id;
+    persistSessionIndex();
+  }
+  let data = null;
+  try{ data = await sessGet(activeSessionId); }catch(e){}
+  loadSessionData(data || legacy);
+}
+
+/* عرض جلسة على الواجهة بعد تبديلها */
+function applySessionToUI(data){
+  if(typeof closeCombatPanel==="function") closeCombatPanel();
+  closeAllPopups();
+  clearAttackRanges();
+  document.querySelectorAll('#dmg-popups-layer .dmg-popup').forEach(e=>e.remove());
+  selectedTokenId = null;
+  loadSessionData(data);
+  renderAll();
+  if(!data || !data.pan) zoomFit();
+}
+
+async function switchSession(id, keepModal){
+  if(id === activeSessionId){ if(!keepModal) closeModal(); return; }
+  if(!sessions.some(s=>s.id===id)) return;
+  await flushBfState();                       // احفظ الجلسة الحالية قبل مغادرتها
+  let data = null;
+  try{ data = await sessGet(id); }catch(e){}
+  activeSessionId = id;
+  persistSessionIndex();
+  applySessionToUI(data);
+  if(!keepModal) closeModal();
+  showToast('📁 '+(getActiveSession()?.name||''));
+}
+
+async function createSessionFromInput(){
+  const inp = document.getElementById('sess-new-name');
+  const name = (inp?.value || '').trim() || nextSessionName();
+  await flushBfState();
+  const rec = newSessionRecord(name);
+  sessions.push(rec);
+  activeSessionId = rec.id;
+  persistSessionIndex();
+  applySessionToUI(null);
+  try{ await sessPut(rec.id, snapshotState()); }catch(e){}
+  closeModal();
+  showToast('📁 جلسة جديدة: '+name);
+  openMapSetup();                              // الخطوة التالية الطبيعية: تحميل خريطة الجلسة
+}
+
+function renameSession(id){
+  const s = sessions.find(x=>x.id===id); if(!s) return;
+  const name = (prompt('اسم الجلسة:', s.name) || '').trim();
+  if(!name) return;
+  s.name = name;
+  persistSessionIndex();
+  renderSessionsList();
+  updateHeaderSub();
+}
+
+async function duplicateSession(id){
+  const s = sessions.find(x=>x.id===id); if(!s) return;
+  await flushBfState();
+  const data = (id === activeSessionId) ? snapshotState() : await sessGet(id);
+  const rec = newSessionRecord(s.name+' (نسخة)');
+  Object.assign(rec, sessionMetaFrom(data));
+  try{ await sessPut(rec.id, cloneJson(data || {})); }
+  catch(e){ showToast('⚠ فشل النسخ: مساحة التخزين ممتلئة'); return; }
+  sessions.push(rec);
+  persistSessionIndex();
+  renderSessionsList();
+  showToast('⧉ تم نسخ الجلسة');
+}
+
+async function deleteSession(id){
+  const s = sessions.find(x=>x.id===id); if(!s) return;
+  if(sessions.length <= 1){ showToast('⚠ لا يمكن حذف الجلسة الوحيدة'); return; }
+  if(!confirm(`حذف الجلسة «${s.name}» نهائياً مع خريطتها وشخصياتها؟`)) return;
+  if(id === activeSessionId){
+    const other = sessions.find(x=>x.id!==id);
+    await switchSession(other.id, true);
+  }
+  sessions = sessions.filter(x=>x.id!==id);
+  await sessDel(id);
+  persistSessionIndex();
+  renderSessionsList();
+  updateHeaderSub();
+  showToast('🗑 تم حذف الجلسة');
+}
+
+function renderSessionsList(){
+  const wrap = document.getElementById('sess-list');
+  if(!wrap) return;
+  const list = [...sessions].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  wrap.innerHTML = list.map(s=>{
+    const active = s.id === activeSessionId;
+    const m = active ? sessionMetaFrom(state) : s;    // الجلسة الحالية تُعرض من الحالة الحية
+    let when = '';
+    try{ when = s.updatedAt ? new Date(s.updatedAt).toLocaleString('ar-SA') : ''; }catch(e){}
+    return `
+      <div class="sess-item${active?' active':''}">
+        <div class="sess-main" onclick="switchSession('${s.id}')">
+          <div class="sess-name">${active?'● ':''}${_escS(s.name)}</div>
+          <div class="sess-sub">${m.hasMap?'🗺':'⬜ بلا خريطة'} ${m.cols}×${m.rows} • ${m.tokens} شخصيات${when?' • '+when:''}</div>
+        </div>
+        <div class="sess-actions">
+          <button title="إعادة تسمية" onclick="renameSession('${s.id}')">✏</button>
+          <button title="نسخ الجلسة" onclick="duplicateSession('${s.id}')">⧉</button>
+          <button title="حذف" class="danger" onclick="deleteSession('${s.id}')">🗑</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function openSessionsModal(){
+  openModal(`
+    <span class="modal-handle"></span>
+    <div class="modal-title">📁 الجلسات</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
+      لكل جلسة خريطتها وشخصياتها الخاصة، وتُحفظ تلقائياً على هذا الجهاز. اضغط على جلسة لفتحها.
+    </div>
+    <div class="form-row" style="margin-bottom:12px;">
+      <input id="sess-new-name" class="form-input" style="flex:1;" placeholder="اسم الجلسة الجديدة (اختياري)"
+        onkeydown="if(event.key==='Enter')createSessionFromInput()">
+      <button class="btn btn-primary" style="white-space:nowrap;padding:10px 14px;" onclick="createSessionFromInput()">＋ جديدة</button>
+    </div>
+    <div id="sess-list"></div>
+    <div class="btn-row"><button class="btn btn-ghost" style="flex:1" onclick="closeModal()">إغلاق</button></div>
+  `);
+  renderSessionsList();
+}
+
+/* لا تفقد آخر تعديل عند إغلاق الصفحة أو تبديل التبويب */
+window.addEventListener('pagehide', ()=>{ flushBfState(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) flushBfState(); });
+
+/* ═══════════════════════════════════════
+   RENDER ALL
+═══════════════════════════════════════ */
+function renderAll(){
+  applyTransform();
+  renderMap();
+  renderGrid();
+  renderTokens();
+  updateHeaderSub();
+  updateTokenCountDisplay();
+}
+
+function applyTransform(){
+  bfCanvas.style.transform = `translate(${state.pan.x}px,${state.pan.y}px) scale(${state.zoom})`;
+  bfCanvas.style.transformOrigin = '0 0';
+  updateTokenLabelScales();
+  if(attackRangeState) _drawAttackRange();   // أزرار النطاق تحافظ على حجمها على الشاشة عند التكبير
+}
+
+function renderMap(){
+  // احسب أبعاد الشبكة أولاً
+  if(!state.mapW || !state.mapH){
+    state.mapW = state.gridCols * state.cellPx;
+    state.mapH = state.gridRows * state.cellPx;
+  }
+  const W = state.mapW, H = state.mapH;
+
+  // اضبط حجم bf-canvas دائماً حتى تكون الشبكة مرئية
+  bfCanvas.style.width  = W + 'px';
+  bfCanvas.style.height = H + 'px';
+
+  if(state.mapSrc){
+    mapImg.src = state.mapSrc;
+    mapImg.style.display = 'block';
+    mapImg.style.width  = W + 'px';
+    mapImg.style.height = H + 'px';
+    document.getElementById('empty-bf').style.display = 'none';
+  } else if(W && H){
+    // شبكة بدون صورة — خلفية داكنة شبه شفافة
+    mapImg.style.display = 'none';
+    document.getElementById('empty-bf').style.display = 'none';
+    bfCanvas.style.background = '#0d1020';
+  } else {
+    mapImg.style.display = 'none';
+    document.getElementById('empty-bf').style.display = 'flex';
+    bfCanvas.style.background = '';
+  }
+}
+
+/* ── عناصر الشبكة ── */
+const gridCanvas = document.getElementById('grid-canvas-overlay');
+const gridCtx    = gridCanvas ? gridCanvas.getContext('2d') : null;
+
+function renderGrid(){
+  if(!gridCtx){ return; }
+
+  // احسب أبعاد الشبكة
+  if(!state.mapW || !state.mapH){
+    state.mapW = state.gridCols * state.cellPx;
+    state.mapH = state.gridRows * state.cellPx;
+  }
+  const W = state.mapW, H = state.mapH;
+
+  // دائماً اضبط حجم الـ canvas على حجم الشبكة
+  gridCanvas.width  = W || state.gridCols * state.cellPx;
+  gridCanvas.height = H || state.gridRows * state.cellPx;
+  gridCanvas.style.width  = gridCanvas.width  + 'px';
+  gridCanvas.style.height = gridCanvas.height + 'px';
+
+  // امسح
+  gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+
+  if(!state.gridVis) return;
+
+  const cols = state.gridCols, rows = state.gridRows;
+  const cp   = state.cellPx;
+
+  // استخرج اللون من state (rgba أو hex)
+  const rawClr = state.gridColor || 'rgba(200,30,30,0.65)';
+  const borderClr = state.gridBorderColor || rawClr.replace(/[\d.]+\)$/, '0.95)');
+
+  // رسم الخطوط الداخلية
+  gridCtx.save();
+  gridCtx.strokeStyle = rawClr;
+  gridCtx.lineWidth = 1;
+
+  for(let c = 1; c < cols; c++){
+    const x = c * cp + 0.5;
+    gridCtx.beginPath();
+    gridCtx.moveTo(x, 0);
+    gridCtx.lineTo(x, H);
+    gridCtx.stroke();
+  }
+  for(let r = 1; r < rows; r++){
+    const y = r * cp + 0.5;
+    gridCtx.beginPath();
+    gridCtx.moveTo(0, y);
+    gridCtx.lineTo(W, y);
+    gridCtx.stroke();
+  }
+
+  // رسم الحدود الخارجية بخط أسمك
+  gridCtx.strokeStyle = borderClr;
+  gridCtx.lineWidth = 2.5;
+  gridCtx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  // تسميات الإحداثيات كل 5 خلايا
+  gridCtx.fillStyle = rawClr.replace(/[\d.]+\)$/, '0.7)');
+  gridCtx.font = '10px monospace';
+  gridCtx.textBaseline = 'top';
+  for(let c = 0; c <= cols; c += 5){
+    for(let r = 0; r <= rows; r += 5){
+      if(c === 0 && r === 0) continue;
+      gridCtx.fillText(`${c},${r}`, c * cp + 2, r * cp + 2);
+    }
+  }
+
+  gridCtx.restore();
+}
+
+function renderTokens(){
+  document.querySelectorAll('.token').forEach(el=>el.remove());
+  if(!state.mapSrc) return;
+  state.tokens.forEach(tok => renderToken(tok));
+  // keep label sizes in sync with current zoom
+  updateTokenLabelScales();
+}
+
+function renderToken(tok){
+  const el = document.createElement('div');
+  el.className = 'token' + (tok.id===selectedTokenId?' selected':'');
+  el.id = 'tok_'+tok.id;
+  el.style.left = tok.x + 'px';
+  el.style.top  = tok.y + 'px';
+
+  // token size: (charSize / 100) * cellPx — this is the ICON diameter in map-px
+  const sizeRatio = Math.max(0.3, (tok.charSize||100) / 100);
+  const tokPx = sizeRatio * state.cellPx;
+
+  // avatar
+  const avatarDiv = document.createElement('div');
+  avatarDiv.className = 'token-avatar' + (!getCharImage(tok.profileId)?' no-img':'');
+  avatarDiv.style.width    = tokPx + 'px';
+  avatarDiv.style.height   = tokPx + 'px';
+  avatarDiv.style.fontSize = (tokPx * 0.48) + 'px';
+  avatarDiv.style.borderColor = tok.raceColor || '#7c3aed';
+  // مركز الأفاتار = نقطة الحاوية؛ الاسم والبارات يلتصقان بحافتيه العلوية والسفلية
+  avatarDiv.style.left = (-tokPx/2) + 'px';
+  avatarDiv.style.top  = (-tokPx/2) + 'px';
+  el.dataset.half = String(tokPx/2);
+
+  const imgSrc = getCharImage(tok.profileId);
+  if(imgSrc){
+    const img = document.createElement('img');
+    img.src = imgSrc;
+    img.draggable = false;
+    avatarDiv.appendChild(img);
+  } else {
+    avatarDiv.textContent = tok.emoji || '⚔';
+  }
+
+  // name label — will be counter-scaled vs zoom
+  const nameDiv = document.createElement('div');
+  nameDiv.className = 'token-name';
+  nameDiv.textContent = tok.name || '؟';
+
+  // stat bars label — also counter-scaled
+  const barsDiv = document.createElement('div');
+  barsDiv.className = 'token-bars';
+  let barsHTML = buildMiniBar('❤', tok.hp, tok.hpMax, '#ef4444')
+    + buildMiniBar('✨', tok.hala, tok.halaMax, '#a855f7')
+    + buildMiniBar('⚡', tok.stamina, tok.staminaMax, '#f59e0b');
+  // بارات صحة إضافية
+  if(tok.extraBars && tok.extraBars.length > 0){
+    tok.extraBars.forEach(bar=>{
+      barsHTML += buildMiniBar('❤', bar.current??bar.max??0, bar.max||1, bar.color||'#f97316');
+    });
+  }
+  barsDiv.innerHTML = barsHTML;
+
+  el.appendChild(avatarDiv);
+  el.appendChild(barsDiv);
+  el.appendChild(nameDiv);   // الاسم آخراً وبأعلى z-index: فوق كل البارات
+
+  el.addEventListener('click', ev => { ev.stopPropagation(); openBattlePopup(tok.id); });
+  el.addEventListener('mousedown', ev => { startTokenDrag(ev, tok.id); });
+  el.addEventListener('touchstart', ev => { startTokenDrag(ev, tok.id); }, {passive:false});
+
+  bfCanvas.appendChild(el);
+  layoutTokenLabels(el);
+  if(typeof combatCurrentTokId==='function' && combatCurrentTokId()===tok.id) el.classList.add('turn-active');
+}
+
+/* الاسم يكبر للأعلى (أصله عند حافته السفلية فوق الأفاتار) والبارات تكبر للأسفل (أصلها عند حافتها العلوية)،
+   فيبقى كلٌّ منهما ملتصقاً بمكانه مهما كان التكبير/التصغير. gap ثابت بالبكسل على الشاشة. */
+/* تفضيلات عرض عامة (لا تتبع جلسة بعينها): حجم الإحصائيات تحت الشخصيات + إخفاؤها */
+const UI_PREFS_KEY = 'amazad_bf_ui_prefs_v1';
+const uiPrefs = { barScale:1, barsHidden:false };
+function loadUiPrefs(){
+  try{
+    const o = JSON.parse(localStorage.getItem(UI_PREFS_KEY)||'{}');
+    if(typeof o.barScale==='number' && o.barScale>=0.5 && o.barScale<=3) uiPrefs.barScale = o.barScale;
+    uiPrefs.barsHidden = !!o.barsHidden;
+  }catch(e){}
+}
+function saveUiPrefs(){ try{ localStorage.setItem(UI_PREFS_KEY, JSON.stringify(uiPrefs)); }catch(e){} }
+function applyBarPrefs(){
+  const cv = document.getElementById('bf-canvas') || bfCanvas;
+  if(cv) cv.classList.toggle('bars-hidden', uiPrefs.barsHidden);
+  const v = document.getElementById('bars-scale-val'); if(v) v.textContent = Math.round(uiPrefs.barScale*100)+'%';
+  const hb = document.getElementById('bars-hide-btn');
+  if(hb){ hb.classList.toggle('on', uiPrefs.barsHidden); hb.textContent = uiPrefs.barsHidden ? '👁 إظهار الإحصائيات' : '🙈 إزالة الإحصائيات'; }
+  document.getElementById('bars-panel')?.classList.toggle('disabled', uiPrefs.barsHidden);
+  updateTokenLabelScales();
+}
+function changeBarScale(d){
+  uiPrefs.barScale = Math.max(0.5, Math.min(3, Math.round((uiPrefs.barScale + d)*10)/10));
+  saveUiPrefs(); applyBarPrefs();
+}
+function resetBarScale(){ uiPrefs.barScale = 1; saveUiPrefs(); applyBarPrefs(); }
+function toggleBarsHidden(){ uiPrefs.barsHidden = !uiPrefs.barsHidden; saveUiPrefs(); applyBarPrefs(); }
+function toggleBarsPanel(){
+  const p = document.getElementById('bars-panel'); if(!p) return;
+  p.hidden = !p.hidden;
+}
+document.addEventListener('pointerdown', e=>{   // إغلاق اللوحة عند الضغط خارجها
+  const p = document.getElementById('bars-panel'); if(!p || p.hidden) return;
+  if(!e.target.closest('#bars-panel') && !e.target.closest('#bars-opt-btn')) p.hidden = true;
+});
+
+function layoutTokenLabels(tokEl){
+  const inv  = 1 / state.zoom;
+  const half = parseFloat(tokEl.dataset.half) || 0;
+  const gap  = 3 * inv;
+  const nm = tokEl.querySelector('.token-name');
+  const br = tokEl.querySelector('.token-bars');
+  if(nm){
+    nm.style.top = (-half) + 'px';
+    nm.style.transformOrigin = '50% 100%';
+    nm.style.transform = `translate(-50%, calc(-100% - ${gap}px)) scale(${inv})`;
+  }
+  if(br){
+    br.style.top = half + 'px';
+    br.style.transformOrigin = '50% 0';
+    br.style.transform = `translate(-50%, ${gap}px) scale(${inv * uiPrefs.barScale})`;
+  }
+}
+function updateTokenLabelScales(){
+  document.querySelectorAll('.token').forEach(layoutTokenLabels);
+}
+
+const _pctOf = (cur, max) => max>0 ? Math.max(0, Math.min(100, (cur/max)*100)) : 0;
+
+/* بار مصغّر على التوكن: القيمة الحالية + نسبة الامتلاء (للصحة والهالة والستامينا) */
+function buildMiniBar(icon, cur, max, color){
+  const pct = _pctOf(cur, max);
+  return `<div class="token-bar-row">
+    <span style="color:${color};font-size:8px;">${icon}</span>
+    <div class="token-bar-track"><div class="token-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+    <span class="token-bar-val" style="color:${color};">${fmt1(cur)} <span class="token-bar-pct">${Math.floor(pct)}%</span></span>
+  </div>`;
+}
+const buildMiniBarPct = buildMiniBar;   // للتوافق: الستامينا صارت تعرض القيمة + النسبة كغيرها
+
+/* قيمة البار داخل نافذة الشخصية: حالي/أقصى + النسبة */
+function bpValHTML(cur, max){
+  return `${fmt1(cur)}/${fmt1(max)} <span class="bp-pct">${Math.floor(_pctOf(cur, max))}%</span>`;
+}
+
+function updateHeaderSub(){
+  const sub = document.getElementById('header-sub');
+  const s = getActiveSession();
+  const pre = s ? `📁 ${s.name} — ` : '';
+  if(state.mapSrc){
+    sub.textContent = pre + `${state.gridCols}×${state.gridRows} خلية — حجم الخلية: ${state.cellPx}px`;
+  } else {
+    sub.textContent = pre + 'لا توجد خريطة محملة';
+  }
+}
+
+function updateTokenCountDisplay(){
+  const el = document.getElementById('token-count-display');
+  const n = state.tokens.length;
+  el.textContent = n===0 ? 'لا توجد شخصيات' : `${n} شخصيات على الخريطة`;
+}
+
+/* ═══════════════════════════════════════
+   CHAR IMAGES  (localStorage)
+═══════════════════════════════════════ */
+function getCharImage(profileId){
+  if(!profileId) return null;
+  return localStorage.getItem(IMG_KEY_PREFIX + profileId) || null;
+}
+
+function saveCharImage(profileId, dataUrl){
+  try{
+    localStorage.setItem(IMG_KEY_PREFIX + profileId, dataUrl);
+  } catch(e){ showToast("⚠ الصورة كبيرة جداً، جرب صورة أصغر"); }
+}
+
+function deleteCharImage(profileId){
+  localStorage.removeItem(IMG_KEY_PREFIX + profileId);
+}
+
+/* ═══════════════════════════════════════
+   READ AMAZAD PROFILES
+═══════════════════════════════════════ */
+function getAmazadProfiles(){
+  // يرجع الـ cache المحمّل مسبقاً، أو يحاول localStorage كـ fallback فوري
+  if(_cachedProfiles !== null) return _cachedProfiles;
+  try{
+    const rawLocalOnly = localStorage.getItem(LOCAL_ONLY_KEY);
+    const localOnly = rawLocalOnly ? JSON.parse(rawLocalOnly) : [];
+    const localOnlyArr = Array.isArray(localOnly) ? localOnly : (localOnly.profiles || []);
+
+    const raw = localStorage.getItem("amazad_profiles") || localStorage.getItem("amazad_v1");
+    const parsed = raw ? JSON.parse(raw) : [];
+    const legacyArr = Array.isArray(parsed) ? parsed : (parsed.profiles || []);
+
+    const ids = new Set(localOnlyArr.map(p=>String(p.saveId||p.id)));
+    return [...localOnlyArr, ...legacyArr.filter(p=>!ids.has(String(p.saveId||p.id)))];
+  } catch(e){ return []; }
+}
+
+function getProfileById(id){
+  return getAmazadProfiles().find(p=>String(p.saveId||p.id)===String(id)) || null;
+}
+
+function getProfileTransforms(profileId){
+  const p = getProfileById(profileId);
+  if(!p) return [];
+  const ids = p._transformIds || p._transforms?.map((_,i)=>i+1) || [];
+  if(p._transformIds){
+    return p._transformIds.map((tid,i)=>{
+      const tp = getProfileById(tid);
+      return { id: tid, label: tp?._transformLabel || `تحول ${i+1}`, profile: tp };
+    }).filter(t=>t.profile);
+  }
+  // old _transforms array fallback
+  return (p._transforms||[]).map((t,i)=>({
+    id: i+1, label: t._transformLabel || `تحول ${i+1}`, profile: {...p,...t}
+  }));
+}
+
+function getSideDefenses(tok){
+  const lg = tok.lifeGrade || (getProfileById(tok.profileId)?.lifeGrade) || '';
+  const classes = tok.classes || (getProfileById(tok.profileId)?.classes) || [];
+  const hasNature = classes.some(c=>c.cls==='طبيعة');
+  const isGrade4  = ['4','4 خاصة'].includes(lg);
+  const isGrade5  = lg === '5';
+  const hasSpec   = isGrade4 || isGrade5;
+
+  // الدفاع المئوي الأساسي = ما في الـ token + الدفاعات المخصصة
+  const base    = trunc1((tok.dmgReduce    ?? 0) + (tok._extraDmgReduce ?? 0));
+  const defense = trunc1((tok.defense      ?? 0) + (tok._extraDefense   ?? 0));
+  const trueDef = trunc1((tok.trueDefense  ?? tok.trueDef ?? 0) + (tok._extraTrueDef ?? 0));
+
+  const side1 = hasSpec ? Math.floor(base * 0.5) : 0;
+  // side2: درجة5 دائماً، درجة4 فقط مع طبيعة
+  const side2 = (isGrade5 || (isGrade4 && hasNature)) ? Math.floor(base * 0.5) : 0;
+  // side3: درجة5 + طبيعة فقط
+  const side3 = (isGrade5 && hasNature) ? Math.floor(base * 0.5) : 0;
+
+  return { side1, side2, side3, hasNature, isGrade4, isGrade5, hasSpec, base, defense, trueDef };
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   فرص الحظ / الحاسة السادسة / التجدد / الأعين  +  المبادرة وترتيب الأدوار
+═══════════════════════════════════════════════════════════════ */
+/* نفس منحنى البونس المحدود في المولّد (أول 10 كاملة، ثم ÷2 حتى 30، ÷4 حتى 50، ÷10 حتى 100، ÷20 فوقها) */
+const cbCapped = (raw) => {
+  const v = Math.max(0, Number(raw)||0);
+  if(v<=10) return v;
+  let c = 10;
+  if(v<=30) c += (v-10)/2;
+  else if(v<=50) c += 20/2 + (v-30)/4;
+  else if(v<=100) c += 20/2 + 20/4 + (v-50)/10;
+  else c += 20/2 + 20/4 + 50/10 + (v-100)/20;
+  return Math.round(c*10)/10;
+};
+const CB_TIERS = ["متعلم","خبير","متقدم","متقن","أستاذ","قديس","نبوي","إلهي","بدائي","أزلي","متسيد"];
+const REGEN_RACES_BF = ["بهائم الظلام","وحش الظلام"];
+
+function cbProfile(tok){
+  if(!tok) return null;
+  try{ return getAmazadProfiles().find(x=>String(x.saveId||x.id)===String(tok.profileId)) || null; }catch(e){ return null; }
+}
+const cbStat = (p,name) => { const s=(p?.stats||[]).find(x=>x.name===name); return Number(s?.value)||0; };
+const cbSkillTotal = (p,name) => {
+  const list = p?.skills||[];
+  const s = list.find(x=>x.name===name && (!x.isBarrier || cbIsRaceCustom(x))) || list.find(x=>x.name===name);
+  return s ? (parseInt(s.bonus)||0)+(parseInt(s.extraBonus)||0) : 0;
+};
+const cbSkillStat = (p,name) => (p?.skills||[]).find(x=>x.name===name)?.stat || null;
+
+function getTokBarrier(tok){ return tok?.barrierBinding || cbProfile(tok)?.barrierBinding || null; }
+/* درجة ربط الحاجز بالبأس تُحسب حيّة من مستوى الشخصية ومستوى الحاجز (لا من نسخة مخزّنة قد تكون ناقصة أو قديمة).
+   الدرجات تراكمية: ثالثة < ثانية < أولى < صفر */
+function cbBarrierDegree(tok){
+  const b = getTokBarrier(tok);
+  const p = cbProfile(tok) || tok;
+  const sk = (p?.skills||[]).find(s=>s.isBarrier && !s.isSakardBonus && !(s.isRaceSkill||s.isLimbSkill||s.isEyeSkill));
+  let boundBas = barrierBoundToBas(b);
+  if(sk){
+    const st = (Array.isArray(sk.bindingStats)&&sk.bindingStats.length) ? sk.bindingStats : [sk.bindingStat||sk.stat];
+    boundBas = st.includes('البأس') || boundBas;
+  }
+  if(!boundBas) return null;
+  const lvl = Number(p?.level ?? tok?.level);
+  if(sk && !isNaN(lvl)){
+    const lvls=['متعلم','خبير','متقدم','متقن','أستاذ','قديس','نبوي','إلهي','بدائي','أزلي'];
+    const bi = lvls.indexOf(sk.level);
+    if(lvl>=30 && bi>=8) return 'صفر';
+    if(lvl>=20 && bi>=7) return 'أولى';
+    if(lvl>=12 && bi>=5) return 'ثانية';
+    if(lvl>=4)           return 'ثالثة';
+    return null;
+  }
+  return (b && b.degree) || null;
+}
+const CB_DEG_RANK = {'ثالثة':1,'ثانية':2,'أولى':3,'صفر':4};
+function barrierBoundToBas(b){ return !!b && (b.stat==='البأس' || (Array.isArray(b.stats) && b.stats.includes('البأس'))); }
+
+/* ── التجدد (بهائم ووحوش الظلام): 10d5 + (بأس + متانة + تجدد) نرد، 5 + تجدد وجه؛ المجاني = محدود(التجدد) ÷ 3 ── */
+function regenInfoFor(p){
+  if(!p || !REGEN_RACES_BF.includes(p.race)) return null;
+  /* مطابقة مرنة للأسماء (تجاهل «ال» والتشكيل والمسافات) + بحث احتياطي عن «التجدد» تحت أي مهارة أو كمهارة مستقلة */
+  const nz = t => String(t||'').replace(/[\u064B-\u065F\u0640]/g,'').replace(/\s+/g,'').replace(/^ال/,'');
+  const sk = (p.skills||[]).find(s=>nz(s.name)==='متانة' && !s.isBarrier) || (p.skills||[]).find(s=>nz(s.name)==='متانة');
+  const stam = sk ? (parseInt(sk.bonus)||0)+(parseInt(sk.extraBonus)||0) : 0;
+  let spec = sk ? (sk.specializations||[]).find(x=>nz(x.name)==='تجدد') : null;
+  if(!spec){ for(const k of (p.skills||[])){ const sp=(k.specializations||[]).find(x=>nz(x.name)==='تجدد'); if(sp){ spec=sp; break; } } }
+  if(!spec) spec = (p.skills||[]).find(x=>nz(x.name)==='تجدد') || null;
+  const R = spec ? (parseInt(spec.bonus)||0)+(parseInt(spec.extraBonus)||0) : 0;
+  const statV = sk ? cbStat(p, sk.stat || 'البأس') : 0;
+  const capped = spec ? cbCapped(statV + stam + R) : 0;
+  const bas = cbStat(p,'البأس');
+  return { dice: 10 + bas + stam + R, faces: 5 + R, free: Math.floor(capped/3 + 1e-9), R, bas, stam, cost: 2 };
+}
+/* ── أعين الإتشيرما (البديه / البصير / العليم): متقن = استعمال مجاني، وكل مستوى فوقه +1 (أستاذ 2، قديس 3، نبوي 4 ...) ── */
+const EYE_RE = /(بديه|بصير|عليم)/;
+function eyeListFor(p){
+  if(!p || p.race!=='إتشيرما') return [];
+  const base = CB_TIERS.indexOf('متقن');
+  return (p.skills||[]).filter(s=>EYE_RE.test(String(s.name||'')) && (!s.isBarrier || s.isEyeSkill) && !s.isLimbSkill).map(s=>{
+    const idx = CB_TIERS.indexOf(s.level);
+    return { name:s.name, level:s.level||null, max: idx>=base ? idx-base+1 : 0 };
+  });
+}
+/* الحظ = ⌈سمة الحظ ÷ 2⌉، الحاسة السادسة = ⌈قيمة المهارة ÷ 2⌉ — تُحسب من الملف إن لم تكن القيم المخزّنة موجودة أو كانت صفراً */
+function cbDerivedChances(p){
+  const luckStat = Number((p?.stats||[]).find(s=>s.name==='الحظ')?.value) || 0;
+  const ss = (p?.skills||[]).find(s=>s.name==='الحاسة السادسة');
+  const ssVal = ss ? (parseInt(ss.bonus)||0)+(parseInt(ss.extraBonus)||0) : 0;
+  return { luck: Math.ceil(luckStat/2), sixth: Math.ceil(ssVal/2) };
+}
+function applyDerivedChances(tok, p, force){
+  p = p || cbProfile(tok); if(!p) return;
+  if(force || tok.luckChancesMax===undefined){
+    const dc = cbDerivedChances(p);
+    const lMax = p.luckChancesMax || p.luckChances || dc.luck;
+    const sMax = p.sixthSenseChancesMax || p.sixthSenseChances || dc.sixth;
+    tok.luckChancesMax = lMax;
+    tok.luckChances = (p.luckChances!=null && p.luckChances>0) ? Math.min(p.luckChances,lMax) : lMax;
+    tok.sixthSenseChancesMax = sMax;
+    tok.sixthSenseChances = (p.sixthSenseChances!=null && p.sixthSenseChances>0) ? Math.min(p.sixthSenseChances,sMax) : sMax;
+  }
+  const rg = regenInfoFor(p);
+  if(rg && (force || tok.regenChancesMax===undefined)){
+    tok.regenChances = rg.free; tok.regenChancesMax = rg.free; tok.regen = {dice:rg.dice, faces:rg.faces, free:rg.free, R:rg.R};
+  }
+  if(p.race==='إتشيرما' && (force || !Array.isArray(tok.eyes))){
+    const old = Array.isArray(tok.eyes) ? tok.eyes : [];
+    tok.eyes = eyeListFor(p).map(e=>{
+      const prev = old.find(o=>o.name===e.name) || (tok.eyeType===e.name && tok.eyeChances!==undefined ? {cur:tok.eyeChances} : null);
+      return { name:e.name, max:e.max, cur: (!force && prev) ? Math.min(prev.cur, e.max) : e.max };
+    });
+  }
+}
+const CHANCE_KEYS = {
+  luck:  ['luckChances','luckChancesMax'],
+  sixth: ['sixthSenseChances','sixthSenseChancesMax'],
+  regen: ['regenChances','regenChancesMax'],
+};
+function renderChancesHTML(tok){
+  // إصلاح الرموز المحفوظة سابقاً بقيمة صفرية خاطئة (مرة واحدة لكل رمز)
+  if(!tok._chFix2){
+    tok._chFix2 = true;
+    const p0 = cbProfile(tok);
+    if(p0){
+      const dc = cbDerivedChances(p0);
+      if(!(tok.luckChancesMax>0) && dc.luck>0){ tok.luckChancesMax = dc.luck; tok.luckChances = dc.luck; }
+      if(!(tok.sixthSenseChancesMax>0) && dc.sixth>0){ tok.sixthSenseChancesMax = dc.sixth; tok.sixthSenseChances = dc.sixth; }
+    }
+  }
+  if(tok.regenChancesMax===undefined || (tok.race==='إتشيرما' && !Array.isArray(tok.eyes))) applyDerivedChances(tok, null, false);
+  const box = (key,label,color) => {
+    const [c,m] = CHANCE_KEYS[key];
+    return `<div class="chance-box">
+      <span class="lb" style="color:${color}">${label}</span>
+      <button onclick="adjustChance('${tok.id}','${key}',-1)" title="استعمال فرصة">−</button>
+      <span class="ct" style="color:${color}">${tok[c]||0}/${tok[m]||0}</span>
+      <button onclick="adjustChance('${tok.id}','${key}',1)" title="استرجاع فرصة">+</button>
+    </div>`;
+  };
+  let h = '';
+  h += box('luck','🍀 فرص الحظ','#22c55e');
+  h += box('sixth','👁 فرص الحاسة السادسة','#e879f9');
+  const rgLive = REGEN_RACES_BF.includes(tok.race) ? regenInfoFor(cbProfile(tok)) : null;   // دائماً من الملف الحالي لا من نسخة قديمة مخزّنة على الشخصية
+  if(rgLive) tok.regen = {...(tok.regen||{}), dice:rgLive.dice, faces:rgLive.faces, R:rgLive.R, free:rgLive.free, bas:rgLive.bas, stam:rgLive.stam};
+  if(tok.regen && REGEN_RACES_BF.includes(tok.race)){
+    h += box('regen','🩸 فرص التجدد (مجانية)','#f87171');
+    h += `<div class="chance-box" style="margin-top:-2px;">
+      <span class="lb" style="font-size:9px;color:var(--muted);">نرد التجدد <b style="color:#fca5a5;direction:ltr;display:inline-block">${tok.regen.dice}d${tok.regen.faces}</b> • 10 + بأس ${tok.regen.bas??'؟'} + متانة ${tok.regen.stam??'؟'} + تجدد ${tok.regen.R||0} • بعد المجانية: ${2} ستامينا</span>
+      <button style="width:auto;padding:0 8px;font-size:10px;" onclick="useRegen('${tok.id}')">🩸 تجديد</button>
+    </div>`;
+  }
+  if(tok.race==='إتشيرما') (tok.eyes||[]).forEach((e,i)=>{ if((e.max||0)>0) h += `<div class="chance-box">
+      <span class="lb" style="color:#38bdf8">👁 فرص ${e.name} (مجانية)</span>
+      <button onclick="adjustEye('${tok.id}',${i},-1)" title="استعمال فرصة">−</button>
+      <span class="ct" style="color:#38bdf8">${e.cur||0}/${e.max||0}</span>
+      <button onclick="adjustEye('${tok.id}',${i},1)" title="استرجاع فرصة">+</button>
+    </div>`; });
+  return h ? `<div style="margin-top:8px;">${h}</div>` : '';
+}
+function refreshChances(tokId){
+  const tok = state.tokens.find(t=>t.id===tokId); const el = document.getElementById('chances-'+tokId);
+  if(tok && el) el.innerHTML = renderChancesHTML(tok);
+}
+function adjustChance(tokId,key,d){
+  const tok = state.tokens.find(t=>t.id===tokId); if(!tok || !CHANCE_KEYS[key]) return;
+  const [c,m] = CHANCE_KEYS[key];
+  if(d>0 && (tok[m]||0)===0 && (key==='luck'||key==='sixth')){ tok[m] = 1; tok[c] = 0; }   // شخصية بلا فرص: أول + يمنحها فرصة ويُرفع السقف
+  tok[c] = Math.max(0, Math.min(tok[m]||0, (tok[c]||0)+d));
+  refreshChances(tokId); saveBfState();
+}
+function adjustEye(tokId,i,d){
+  const tok = state.tokens.find(t=>t.id===tokId); const e = tok?.eyes?.[i]; if(!e) return;
+  e.cur = Math.max(0, Math.min(e.max||0, (e.cur||0)+d));
+  refreshChances(tokId); saveBfState();
+}
+function useRegen(tokId){
+  const tok = state.tokens.find(t=>t.id===tokId); if(!tok) return;
+  const live = regenInfoFor(cbProfile(tok));
+  if(live) tok.regen = {...(tok.regen||{}), dice:live.dice, faces:live.faces, R:live.R, free:live.free, bas:live.bas, stam:live.stam};
+  if(!tok.regen) return;
+  const f = `!roll ${tok.regen.dice}d${tok.regen.faces}`;
+  if((tok.regenChances||0) > 0){
+    tok.regenChances -= 1;
+    showToast(`🩸 تجديد مجاني — ${f}`);
+  } else {
+    if((tok.stamina||0) < 2){ showToast('⚠ ستامينا غير كافية (يلزم 2)'); return; }
+    tok.stamina = trunc1(tok.stamina - 2);
+    showToast(`🩸 تجديد: −2 ستامينا — ${f}`);
+  }
+  try{ navigator.clipboard?.writeText(f)?.catch?.(()=>{}); }catch(e){}
+  const el = document.getElementById('tok_'+tokId);
+  if(el){ el.remove(); renderToken(tok); }
+  refreshPopupBars(tokId); refreshChances(tokId); saveBfState();
+}
+
+/* ═══════════ المبادرة وترتيب الأدوار ═══════════ */
+const CB_DICE = {
+  speed:   {label:'1d30 + قوة + سرعة',        stat:'القوة',   skill:'السرعة'},
+  dex:     {label:'1d30 + براعة + خفة يد',    stat:'البراعة', skill:'خفة اليد'},
+  int:     {label:'1d30 + ذكاء + يقظة',       stat:'الذكاء',  skill:'اليقظة'},
+  barrier: {label:'1d30 + سمة الحاجز'},
+  custom:  {label:'نرد مخصص (مهارات تختارها)'},
+};
+const CB_INT_PERK_MINS = [12,15,20,30,50];   // ميزات الذكاء بعد العاشرة: كل واحدة +2.5 أفضلية مبادرة
+let cbIntUi = { open:false, sel:[], faces:{} };
+let cbMinimized = false;
+
+function cbC(){
+  if(!state.combat || typeof state.combat!=='object') state.combat = {};
+  const C = state.combat;
+  if(!Array.isArray(C.parts)) C.parts = [];
+  if(!Array.isArray(C.order)) C.order = [];
+  if(!Array.isArray(C.cancelled)) C.cancelled = [];
+  if(!Array.isArray(C.log)) C.log = [];
+  if(typeof C.cycle!=='number') C.cycle = 0;
+  if(typeof C.current!=='number') C.current = -1;
+  if(typeof C.seq!=='number') C.seq = 1;
+  return C;
+}
+const cbTok = (id) => state.tokens.find(t=>t.id===id);
+const cbName = (id) => cbTok(id)?.name || '؟';
+function cbLog(msg){ const C=cbC(); C.log.unshift(msg); if(C.log.length>40) C.log.length=40; }
+
+function cbIntAdv(p){
+  const v = cbStat(p,'الذكاء');
+  if(v < 10) return 0;
+  return 5 + 2.5 * CB_INT_PERK_MINS.filter(m=>v>=m).length;
+}
+/* «الحاجز» الحقيقي فقط — مهارات النواة وأعضاء التنانين وأعين الإتشيرما مخزّنة بعلامة isBarrier لكنها مهارات عرقية مخصصة وليست حاجزاً */
+const cbIsRaceCustom = (s) => !!(s && (s.isRaceSkill || s.isLimbSkill || s.isEyeSkill));
+const cbIsTrueBarrier = (s) => !!(s && s.isBarrier && !s.isSakardBonus && !cbIsRaceCustom(s));
+function cbBarrierInfo(p){
+  const sk = (p?.skills||[]).find(cbIsTrueBarrier);
+  if(!sk) return null;
+  const b = p.barrierBinding;
+  const names = (Array.isArray(sk.bindingStats) && sk.bindingStats.length) ? sk.bindingStats
+    : (b && Array.isArray(b.stats) && b.stats.length) ? b.stats : [ (b&&b.stat) || sk.bindingStat || sk.stat ];
+  const statV = Math.max(0, ...names.filter(Boolean).map(n=>cbStat(p,n)));
+  const total = (parseInt(sk.bonus)||0)+(parseInt(sk.extraBonus)||0);
+  return { names, statV, total, skillName: sk.name };
+}
+/* بونس النرد المحدود: محدود(السمة + المهارة) — وللنرد المخصص: محدود(سمات المهارات المختارة + مجموع قيمها) مرة واحدة */
+function cbDieBonus(p, key, skills){
+  if(!p) return {capped:0, text:'لا ملف شخصية'};
+  if(key==='barrier'){
+    const bi = cbBarrierInfo(p);
+    if(!bi) return {capped:0, text:'لا حاجز'};
+    const raw = bi.statV + bi.total;
+    return {capped: cbCapped(raw), text:`محدود(${bi.names.join('/')} ${bi.statV} + ${bi.skillName} ${bi.total}) = ${cbCapped(raw)}`};
+  }
+  if(key==='custom'){
+    const list = (skills||[]).filter(Boolean);
+    if(!list.length) return {capped:0, text:'لم تُحدَّد مهارات'};
+    const stats = [...new Set(list.map(n=>cbSkillStat(p,n)).filter(Boolean))];
+    const raw = stats.reduce((a,n)=>a+cbStat(p,n),0) + list.reduce((a,n)=>a+cbSkillTotal(p,n),0);
+    return {capped: cbCapped(raw), text:`محدود(${stats.join('+')||'—'} + ${list.join('+')} ← ${raw}) = ${cbCapped(raw)}`};
+  }
+  const d = CB_DICE[key] || CB_DICE.speed;
+  const raw = cbStat(p,d.stat) + cbSkillTotal(p,d.skill);
+  return {capped: cbCapped(raw), text:`محدود(${d.stat} ${cbStat(p,d.stat)} + ${d.skill} ${cbSkillTotal(p,d.skill)}) = ${cbCapped(raw)}`};
+}
+/* مجموع نرد واحد لشخصية بوجه معيّن */
+function cbDieTotal(part, which, face){
+  const tok = cbTok(part.tokId), p = cbProfile(tok);
+  const key = which===1 ? part.die : part.die2, sk = which===1 ? part.skills : part.skills2;
+  const adv = Number(which===1 ? part.adv : part.adv2)||0;
+  const b = cbDieBonus(p, key, sk), ia = cbIntAdv(p);
+  return { face, bonus:b.capped, text:b.text, intAdv:ia, adv, total: face==null ? null : trunc1(face + b.capped + ia + adv) };
+}
+function cbPartValue(part, f1, f2){
+  const d1 = cbDieTotal(part,1,f1);
+  if(!part.two) return {value:d1.total, nat:f1, d1, d2:null};
+  const d2 = cbDieTotal(part,2,f2);
+  if(d1.total==null || d2.total==null) return {value:null, nat:null, d1, d2};
+  return d2.total < d1.total ? {value:d2.total, nat:f2, d1, d2} : {value:d1.total, nat:f1, d1, d2};   // الأسوأ
+}
+const cbRollFace = () => 1 + Math.floor(Math.random()*30);
+
+function cbEnsurePart(tokId){
+  const C = cbC();
+  let pt = C.parts.find(x=>x.tokId===tokId);
+  if(pt) return pt;
+  const p = cbProfile(cbTok(tokId));
+  pt = { tokId, die: cbBarrierInfo(p) ? 'barrier' : 'speed', skills:[], adv:0, two:false, die2:'speed', skills2:[], adv2:0, face1:null, face2:null };
+  C.parts.push(pt);
+  return pt;
+}
+function cbAddPart(){
+  const sel = document.getElementById('cb-add-sel'); if(!sel || !sel.value) return;
+  cbEnsurePart(sel.value); saveBfState(); renderCombatPanel();
+}
+function cbAddAll(){ state.tokens.forEach(t=>cbEnsurePart(t.id)); saveBfState(); renderCombatPanel(); }
+function cbRemovePart(tokId){
+  const C = cbC();
+  C.parts = C.parts.filter(x=>x.tokId!==tokId);
+  cbDropFromOrder(tokId);
+  saveBfState(); renderCombatPanel(); highlightCurrentTurn();
+}
+function cbDropFromOrder(tokId){
+  const C = cbC(); const curId = C.order[C.current]?.id;
+  C.order = C.order.filter(e=>e.tokId!==tokId);
+  C.current = curId ? C.order.findIndex(e=>e.id===curId) : -1;
+  if(C.current<0 && C.order.length) C.current = C.order.findIndex(e=>!e.played);
+}
+function combatOnTokenRemoved(tokId){
+  const C = cbC();
+  C.parts = C.parts.filter(x=>x.tokId!==tokId);
+  cbDropFromOrder(tokId);
+  if(document.getElementById('combat-panel')?.hidden===false) renderCombatPanel();
+}
+function cbSetField(tokId, field, val){
+  const pt = cbC().parts.find(x=>x.tokId===tokId); if(!pt) return;
+  if(field==='adv'||field==='adv2') pt[field] = Number(val)||0;
+  else if(field==='face1'||field==='face2'){ const n = parseInt(val); pt[field] = (isFinite(n) && n>=1 && n<=30) ? n : null; }
+  else if(field==='two') pt.two = !!val;
+  else pt[field] = val;
+  saveBfState(); renderCombatPanel();
+}
+function cbToggleSkill(tokId, which, name){
+  const pt = cbC().parts.find(x=>x.tokId===tokId); if(!pt) return;
+  const k = which===1 ? 'skills' : 'skills2';
+  pt[k] = pt[k].includes(name) ? pt[k].filter(s=>s!==name) : [...pt[k], name];
+  saveBfState(); renderCombatPanel();
+}
+function cbRoll(tokId, which){
+  const pt = cbC().parts.find(x=>x.tokId===tokId); if(!pt) return;
+  if(which===0){ pt.face1 = cbRollFace(); if(pt.two) pt.face2 = cbRollFace(); }
+  else pt['face'+which] = cbRollFace();
+  saveBfState(); renderCombatPanel();
+}
+function cbRollAll(){
+  cbC().parts.forEach(pt=>{ pt.face1 = cbRollFace(); pt.face2 = pt.two ? cbRollFace() : null; });
+  saveBfState(); renderCombatPanel();
+}
+
+/* ── بناء ترتيب الدورة ── */
+function cbBuildOrder(){
+  const C = cbC();
+  const items = [], notes = [];
+  C.parts.forEach(pt=>{
+    const pv = cbPartValue(pt, pt.face1, pt.face2);
+    if(pv.value==null){ notes.push(`⚠ ${cbName(pt.tokId)}: لم يُرمَ نرده بعد`); return; }
+    items.push({ tokId:pt.tokId, value:pv.value, nat:pv.nat, intv: cbStat(cbProfile(cbTok(pt.tokId)),'الذكاء') });
+  });
+  if(!items.length){ showToast('⚠ ارمِ نرود المشاركين أولاً'); renderCombatPanel(); return; }
+  const removed = items.filter(i=>i.nat===1);                               // 30/1: يُطرد من الدورة
+  const nat30s  = items.filter(i=>i.nat===30 && i.nat!==1);
+  const special = nat30s.length===1 ? nat30s[0] : null;                     // أكثر من 30 واحد: تُلغى الأفضلية عن الجميع
+  if(nat30s.length>1) notes.push('30 طبيعي لأكثر من شخص: عوملت كنرد عادي');
+  const normal  = items.filter(i=>i.nat!==1 && i!==special);
+
+  const entries = []; const turnCount = {};
+  normal.forEach(it=>{
+    const others = normal.filter(o=>o!==it);
+    let k = 0;
+    if(others.length){ const minO = Math.min(...others.map(o=>o.value)); k = Math.max(0, Math.floor((it.value-minO)/15 + 1e-9)); }
+    turnCount[it.tokId] = 1 + k;
+    entries.push({tokId:it.tokId, value:it.value, intv:it.intv, kind:'main'});
+    for(let j=1;j<=k;j++) entries.push({tokId:it.tokId, value:trunc1(it.value-15*j), intv:it.intv, kind:'extra'});
+  });
+  entries.forEach(e=>{ e.turns = turnCount[e.tokId]; });
+  entries.sort((a,b)=> b.value-a.value || b.intv-a.intv || a.turns-b.turns);
+
+  // التعادل: الأعلى ذكاءً، ثم الأقل أدواراً، وإن تطابقا كلياً يُلغى دوراهما (توتر/ارتياب)
+  const cancelled = [], kept = [];
+  entries.forEach(e=>{
+    const twin = entries.some(o=>o!==e && o.value===e.value && o.tokId!==e.tokId && o.intv===e.intv && o.turns===e.turns);
+    if(twin) cancelled.push({tokId:e.tokId, value:e.value, reason:'تعادل تام (ذكاء وأدوار): ألغي الدوران'}); else kept.push(e);
+  });
+
+  const seq = () => 'e'+(C.seq++);
+  const order = [];
+  if(special){
+    order.push({id:seq(), tokId:special.tokId, value:special.value, kind:'nat30', note:'30 طبيعي — الأول', played:false});
+    order.push({id:seq(), tokId:special.tokId, value:special.value, kind:'nat30free', note:'دور إضافي مجاني', played:false});
+  }
+  kept.forEach(e=>order.push({id:seq(), tokId:e.tokId, value:e.value, kind:e.kind, note:e.kind==='extra'?'دور إضافي (فرق 15+)':'', played:false}));
+  removed.forEach(r=>cbLog(`💀 ${cbName(r.tokId)}: نرد 1 — طُرد من الدورة`));
+  cancelled.forEach(c=>cbLog(`⊘ ${cbName(c.tokId)} (${fmt1(c.value)}): ${c.reason}`));
+  notes.forEach(n=>cbLog(n));
+  C.order = order; C.cancelled = cancelled; C.removed = removed.map(r=>r.tokId);
+  C.current = order.length ? 0 : -1;
+  cbIntUi = { open:false, sel:[], faces:{} };
+  cbLog(`📋 رُتّبت أدوار الدورة ${C.cycle||1}: ${order.length} دور`);
+  if(!C.cycle) C.cycle = 1;
+  saveBfState(); renderCombatPanel(); highlightCurrentTurn();
+}
+
+/* ── التحكم بالدور الحالي ── */
+function combatCurrentTokId(){ const C=state.combat; return (C && C.order && C.order[C.current]) ? C.order[C.current].tokId : null; }
+function highlightCurrentTurn(){
+  const cur = combatCurrentTokId();
+  document.querySelectorAll('.token').forEach(el=>el.classList.toggle('turn-active', !!cur && el.id==='tok_'+cur));
+}
+function cbSetCurrent(i){ const C=cbC(); if(i<0||i>=C.order.length) return; C.current=i; C.order[i].played=false; saveBfState(); renderCombatPanel(); highlightCurrentTurn(); }
+function cbTogglePlayed(i){ const C=cbC(); if(!C.order[i]) return; C.order[i].played=!C.order[i].played; saveBfState(); renderCombatPanel(); }
+function cbRemoveEntry(i){
+  const C=cbC(); if(!C.order[i]) return;
+  const curId=C.order[C.current]?.id; C.order.splice(i,1);
+  C.current = curId ? C.order.findIndex(e=>e.id===curId) : -1;
+  saveBfState(); renderCombatPanel(); highlightCurrentTurn();
+}
+function cbNext(){
+  const C=cbC(); if(!C.order.length){ showToast('⚠ لا توجد أدوار'); return; }
+  if(C.order[C.current]) C.order[C.current].played = true;
+  let nxt = -1;
+  for(let i=C.current+1;i<C.order.length;i++){ if(!C.order[i].played){ nxt=i; break; } }
+  if(nxt<0) nxt = C.order.findIndex(e=>!e.played);
+  C.current = nxt;
+  if(nxt<0){ cbLog(`✅ انتهت الدورة ${C.cycle||1}`); showToast('✅ انتهت الدورة — ابدأ دورة جديدة وارمِ المبادرة'); }
+  saveBfState(); renderCombatPanel(); highlightCurrentTurn();
+}
+function cbNewCycle(){
+  const C=cbC();
+  C.cycle = (C.cycle||0) + 1;
+  C.parts.forEach(pt=>{ pt.face1=null; pt.face2=null; });
+  C.order=[]; C.cancelled=[]; C.removed=[]; C.current=-1;
+  cbIntUi = { open:false, sel:[], faces:{} };
+  cbLog(`🔄 الدورة ${C.cycle}: ارمِ نرود المبادرة من جديد`);
+  saveBfState(); renderCombatPanel(); highlightCurrentTurn();
+}
+function cbResetAll(){
+  if(!confirm('مسح كل بيانات القتال والمبادرة لهذه الجلسة؟')) return;
+  state.combat = {cycle:0, parts:[], order:[], current:-1, log:[], cancelled:[], seq:1};
+  cbIntUi = { open:false, sel:[], faces:{} };
+  saveBfState(); renderCombatPanel(); highlightCurrentTurn();
+}
+
+/* ── التدخل: نرد مبادرة بإعاقة −10 ضد الدور الحالي ومن بعده ── */
+function cbToggleIntUi(){ cbIntUi.open = !cbIntUi.open; if(!cbIntUi.open) cbIntUi={open:false,sel:[],faces:{}}; renderCombatPanel(); }
+function cbIntToggleSel(tokId){
+  cbIntUi.sel = cbIntUi.sel.includes(tokId) ? cbIntUi.sel.filter(x=>x!==tokId) : [...cbIntUi.sel, tokId];
+  renderCombatPanel();
+}
+function cbIntFace(tokId, which, val){
+  const f = cbIntUi.faces[tokId] || (cbIntUi.faces[tokId]={});
+  if(val==='roll') f['f'+which] = cbRollFace();
+  else { const n=parseInt(val); f['f'+which] = (isFinite(n)&&n>=1&&n<=30) ? n : null; }
+  renderCombatPanel();
+}
+function cbIntResult(tokId){
+  const pt = cbEnsurePart(tokId);
+  const f = cbIntUi.faces[tokId] || {};
+  const pv = cbPartValue(pt, f.f1??null, pt.two ? (f.f2??null) : null);
+  return pv.value==null ? null : trunc1(pv.value - 10);
+}
+function cbResolveIntervention(){
+  const C = cbC();
+  const list = cbIntUi.sel.filter(id=>cbTok(id) && !C.order.some(e=>e.tokId===id));
+  if(!list.length){ showToast('⚠ اختر شخصية متدخلة'); return; }
+  const rolled = list.map(id=>({tokId:id, res:cbIntResult(id)}));
+  if(rolled.some(r=>r.res==null)){ showToast('⚠ ارمِ نرد كل متدخل أولاً'); return; }
+  const intOf = id => cbStat(cbProfile(cbTok(id)),'الذكاء');
+  rolled.sort((a,b)=> b.res-a.res || intOf(b.tokId)-intOf(a.tokId));
+
+  const startIdx = Math.max(C.current, 0);
+  const pend = [];
+  C.order.forEach((e,i)=>{ if(i>=startIdx && !e.played) pend.push(i); });
+  const win = [], guaranteed = [];
+  rolled.forEach((r,i)=>{
+    if(i >= pend.length){ guaranteed.push(r); return; }                   // أكثر من الأدوار المتبقية: دور مضمون في النهاية
+    const target = C.order[pend[i]];
+    if(r.res > target.value){ win.push({...r, target}); cbLog(`✋ ${cbName(r.tokId)} (${fmt1(r.res)}) تدخل ضد ${cbName(target.tokId)} (${fmt1(target.value)}) ونجح`); }
+    else cbLog(`⛔ ${cbName(r.tokId)} (${fmt1(r.res)}) فشل ضد ${cbName(target.tokId)} (${fmt1(target.value)}) — ينتظر الدورة القادمة`);
+  });
+  const seq = () => 'e'+(C.seq++);
+  const insertAt = pend.length ? pend[0] : C.order.length;
+  const wins = win.map(w=>({id:seq(), tokId:w.tokId, value:w.res, kind:'intervene', note:`تدخل ضد ${cbName(w.target.tokId)}`, played:false}));
+  C.order.splice(insertAt, 0, ...wins);
+  win.forEach(w=>{ const e=C.order.find(x=>x.id===w.target.id); if(e) e.note = (e.note?e.note+' • ':'')+'مؤجَّل بسبب تدخل'; });
+  guaranteed.forEach(g=>{ C.order.push({id:seq(), tokId:g.tokId, value:g.res, kind:'guaranteed', note:'دور مضمون — نهاية الدورة', played:false}); cbLog(`✓ ${cbName(g.tokId)}: تدخل مضمون في نهاية الدورة`); });
+  if(wins.length) C.current = insertAt;
+  cbIntUi = { open:false, sel:[], faces:{} };
+  saveBfState(); renderCombatPanel(); highlightCurrentTurn();
+}
+
+/* ── الواجهة ── */
+function toggleCombatPanel(){
+  let el = document.getElementById('combat-panel');
+  if(!el){ el = document.createElement('div'); el.id='combat-panel'; el.className='combat-panel'; el.hidden = true; document.body.appendChild(el); }
+  el.hidden = !el.hidden;
+  if(!el.hidden) renderCombatPanel();
+}
+function closeCombatPanel(){ const el=document.getElementById('combat-panel'); if(el) el.hidden=true; }
+function cbMinToggle(){ cbMinimized = !cbMinimized; renderCombatPanel(); }
+
+function renderCombatPanel(){
+  const el = document.getElementById('combat-panel');
+  if(!el || el.hidden) return;
+  const C = cbC();
+  const esc = (typeof _escS==='function') ? _escS : (s=>String(s));
+  const kindBadge = (e) => ({main:'', extra:'<span class="cb-badge extra">إضافي</span>', nat30:'<span class="cb-badge nat">30 طبيعي</span>',
+    nat30free:'<span class="cb-badge nat">مجاني</span>', intervene:'<span class="cb-badge int">تدخل</span>', guaranteed:'<span class="cb-badge int">مضمون</span>'})[e.kind] || '';
+
+  let h = `<div class="cb-title" style="font-size:13px;">
+      <span>⚔ المبادرة — الدورة ${C.cycle||0}</span>
+      <span class="cb-btns"><button class="cb-btn sm" onclick="cbMinToggle()">${cbMinimized?'▲':'▼'}</button><button class="cb-btn sm red" onclick="closeCombatPanel()">✕</button></span>
+    </div>`;
+  if(cbMinimized){
+    const cur = C.order[C.current];
+    h += `<div class="cb-sub">${cur?`الدور الحالي: <b style="color:#4ade80">${esc(cbName(cur.tokId))}</b>`:'لا يوجد دور حالي'}
+      <button class="cb-btn sm green" onclick="cbNext()">⏭ التالي</button></div>`;
+    el.innerHTML = h; return;
+  }
+  h += `<div class="cb-btns" style="margin-bottom:6px;">
+      <button class="cb-btn gold" onclick="cbRollAll()">🎲 رمي الكل</button>
+      <button class="cb-btn green" onclick="cbBuildOrder()">📋 ترتيب الأدوار</button>
+      <button class="cb-btn green" onclick="cbNext()">⏭ التالي</button>
+      <button class="cb-btn" onclick="cbToggleIntUi()">✋ تدخل</button>
+      <button class="cb-btn" onclick="cbNewCycle()">🔄 دورة جديدة</button>
+      <button class="cb-btn red" onclick="cbResetAll()">🧹 مسح</button>
+    </div>`;
+
+  // ── الأدوار ──
+  h += `<div class="cb-sec"><div class="cb-title">📜 ترتيب الأدوار <span class="cb-sub">كل دور ≈ 1~3 ثوانٍ (يقدّرها الراوي)</span></div>`;
+  if(!C.order.length) h += `<div class="cb-sub">لا يوجد ترتيب بعد: أضف المشاركين، ارمِ نرودهم ثم اضغط «ترتيب الأدوار».</div>`;
+  C.order.forEach((e,i)=>{
+    const cur = i===C.current;
+    h += `<div class="cb-turn${cur?' current':''}${e.played?' played':''}">
+      <span class="val">${fmt1(e.value)}</span>
+      <span class="nm">${cur?'▶ ':''}${esc(cbName(e.tokId))}</span>
+      ${kindBadge(e)}${e.note&&!['nat30','nat30free'].includes(e.kind)?`<span class="cb-badge">${esc(e.note)}</span>`:''}
+      <button class="cb-btn sm green" title="اجعله اللاعب الحالي" onclick="cbSetCurrent(${i})">▶</button>
+      <button class="cb-btn sm" title="لعب / لم يلعب" onclick="cbTogglePlayed(${i})">${e.played?'↺':'✓'}</button>
+      <button class="cb-btn sm red" title="حذف الدور" onclick="cbRemoveEntry(${i})">✕</button>
+    </div>`;
+  });
+  (C.cancelled||[]).forEach(c=>{ h += `<div class="cb-turn played"><span class="val">${fmt1(c.value)}</span><span class="nm">${esc(cbName(c.tokId))}</span><span class="cb-badge bad">ملغى — ${esc(c.reason)}</span></div>`; });
+  (C.removed||[]).forEach(id=>{ h += `<div class="cb-turn played"><span class="val">1</span><span class="nm">${esc(cbName(id))}</span><span class="cb-badge bad">طُرد من الدورة (نرد 1)</span></div>`; });
+  h += `</div>`;
+
+  // ── التدخل ──
+  if(cbIntUi.open){
+    const cand = state.tokens.filter(t=>!C.order.some(e=>e.tokId===t.id));
+    h += `<div class="cb-sec"><div class="cb-title">✋ تدخل في الدورة <span class="cb-sub">إعاقة −10 على النرد • دور واحد فقط</span></div>`;
+    if(!cand.length) h += `<div class="cb-sub">كل الشخصيات داخل الدورة بالفعل.</div>`;
+    h += `<div class="cb-row" style="margin:0 0 6px;">${cand.map(t=>`<span class="cb-chip${cbIntUi.sel.includes(t.id)?' on':''}" onclick="cbIntToggleSel('${t.id}')">${esc(t.name)}</span>`).join('')}</div>`;
+    cbIntUi.sel.filter(id=>cbTok(id)).forEach(id=>{
+      const pt = cbEnsurePart(id), f = cbIntUi.faces[id]||{};
+      const res = cbIntResult(id);
+      h += `<div class="cb-part"><div class="cb-part-head"><span class="nm">${esc(cbName(id))}</span>
+        <span class="cb-badge">${esc(CB_DICE[pt.die].label)}${pt.two?' + نرد ثانٍ':''}</span></div>
+        <div class="cb-row">النرد: <input class="cb-num" type="number" min="1" max="30" value="${f.f1??''}" onchange="cbIntFace('${id}',1,this.value)">
+          <button class="cb-btn sm" onclick="cbIntFace('${id}',1,'roll')">🎲</button>
+          ${pt.two?`النرد الثاني: <input class="cb-num" type="number" min="1" max="30" value="${f.f2??''}" onchange="cbIntFace('${id}',2,this.value)"><button class="cb-btn sm" onclick="cbIntFace('${id}',2,'roll')">🎲</button>`:''}
+          <b style="color:#fbbf24">النتيجة (−10): ${res==null?'—':fmt1(res)}</b></div></div>`;
+    });
+    h += `<div class="cb-btns"><button class="cb-btn green" onclick="cbResolveIntervention()">✓ تنفيذ التدخل</button><button class="cb-btn" onclick="cbToggleIntUi()">إلغاء</button></div></div>`;
+  }
+
+  // ── المشاركون ──
+  const free = state.tokens.filter(t=>!C.parts.some(p=>p.tokId===t.id));
+  h += `<div class="cb-sec"><div class="cb-title">👥 المشاركون <span class="cb-sub">اختر نرد كل شخصية</span></div>
+    <div class="cb-btns" style="margin-bottom:6px;">
+      <select class="cb-sel" id="cb-add-sel"><option value="">— إضافة شخصية —</option>${free.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select>
+      <button class="cb-btn green" onclick="cbAddPart()">＋ إضافة</button>
+      <button class="cb-btn" onclick="cbAddAll()">إضافة الكل</button>
+    </div>`;
+  if(!C.parts.length) h += `<div class="cb-sub">لا مشاركين بعد.</div>`;
+  C.parts.forEach(pt=>{
+    const tok = cbTok(pt.tokId); if(!tok) return;
+    const p = cbProfile(tok);
+    const pv = cbPartValue(pt, pt.face1, pt.face2);
+    const dieOpts = (sel) => Object.keys(CB_DICE).map(k=>`<option value="${k}"${k===sel?' selected':''}>${esc(CB_DICE[k].label)}</option>`).join('');
+    const skillChips = (which, chosen) => `<div class="cb-row">${(p?.skills||[]).filter(s=>!s.isLimbSkill).map(s=>`<span class="cb-chip${chosen.includes(s.name)?' on':''}" onclick="cbToggleSkill('${pt.tokId}',${which},'${esc(s.name).replace(/'/g,"\\'")}')">${esc(s.name)}</span>`).join('')||'<span class="cb-sub">لا مهارات</span>'}</div>`;
+    const dieBlock = (which) => {
+      const key = which===1?pt.die:pt.die2, skills = which===1?pt.skills:pt.skills2, adv = which===1?pt.adv:pt.adv2;
+      const face = which===1?pt.face1:pt.face2;
+      const d = cbDieTotal(pt, which, face);
+      return `<div class="cb-row"><b style="color:var(--text)">${which===1?'النرد':'النرد الثاني'}:</b>
+        <select class="cb-sel" onchange="cbSetField('${pt.tokId}','${which===1?'die':'die2'}',this.value)">${dieOpts(key)}</select></div>
+        ${key==='custom'?skillChips(which,skills):''}
+        <div class="cb-row">أفضلية مخصصة: <input class="cb-num" type="number" step="0.5" value="${adv||0}" onchange="cbSetField('${pt.tokId}','${which===1?'adv':'adv2'}',this.value)">
+          نتيجة 1d30: <input class="cb-num" type="number" min="1" max="30" value="${face??''}" onchange="cbSetField('${pt.tokId}','face${which}',this.value)">
+          <button class="cb-btn sm" onclick="cbRoll('${pt.tokId}',${which})">🎲</button></div>
+        <div class="cb-row" style="color:#7a8599">${esc(d.text)}${d.intAdv?` • أفضلية ذكاء +${d.intAdv}`:''}${d.adv?` • مخصصة +${d.adv}`:''}${d.total!=null?` → <b style="color:#fbbf24">${fmt1(d.total)}</b>`:''}</div>`;
+    };
+    h += `<div class="cb-part"><div class="cb-part-head"><span class="nm">${esc(tok.name)}</span>
+      ${pv.value!=null?`<span class="cb-badge nat">${fmt1(pv.value)}${pt.two?' (الأسوأ)':''}</span>`:''}
+      <button class="cb-btn sm red" onclick="cbRemovePart('${pt.tokId}')">✕</button></div>
+      ${!p?'<div class="cb-sub" style="color:#f87171">⚠ ملف الشخصية غير متاح: البونسات = 0</div>':''}
+      ${dieBlock(1)}
+      <div class="cb-row"><label style="cursor:pointer"><input type="checkbox" ${pt.two?'checked':''} onchange="cbSetField('${pt.tokId}','two',this.checked)"> رمي نردين وأخذ الأسوأ</label></div>
+      ${pt.two?dieBlock(2):''}
+    </div>`;
+  });
+  h += `</div>`;
+
+  if(C.log.length) h += `<div class="cb-sec"><div class="cb-title">📝 السجل</div><div class="cb-log">${C.log.map(esc).map(x=>`<div>${x}</div>`).join('')}</div></div>`;
+  el.innerHTML = h;
+}
+
+/* مدى السلاح حسب درجة «المدى» (1~8): نصف متر، متر، مترين، 3 أمتار، 50، 150، 500، أكثر من كيلومترين.
+   الخلية = متر واحد (حجم الشخصية 170سم = 1.7 خلية). الافتراضي درجة 3 = مترين. */
+const WEAPON_RANGE_METERS = [0.5, 1, 2, 3, 50, 150, 500, 2000];
+const WEAPON_RANGE_TIER_LABELS = ['منخفض جدا','منخفض','متوسط','عالي','عالي جدا','خارق','خارق جدا','متسيد'];
+const CELL_METERS = 1;
+function weaponRangeCells(w){
+  const explicit = parseFloat(w.rangeMeters ?? w.rangeCells);
+  if(isFinite(explicit) && explicit>0) return explicit / CELL_METERS;
+  if(w.rangeTier!=null){
+    const tier = Math.max(1, Math.min(8, Math.round(Number(w.rangeTier)||3)));
+    return WEAPON_RANGE_METERS[tier-1] / CELL_METERS;
+  }
+  const legacy = parseFloat(w.size);               // ملفات قديمة خزّنت المدى في size
+  if(isFinite(legacy) && legacy>0) return legacy;
+  return WEAPON_RANGE_METERS[2] / CELL_METERS;     // بلا درجة مخزَّنة: متوسط
+}
+const techRangeCells = (t) => {
+  const v = parseFloat(t.finalSize ?? t.baseSize ?? (t.finalSpeed ? parseFloat(t.finalSpeed)/100 : NaN));
+  return isFinite(v) && v>0 ? v : null;
+};
+
+function getTechniques(profileId){
+  try{
+    const profiles = getAmazadProfiles();
+    const p = profiles.find(x=>(x.saveId||x.id)===profileId || String(x.saveId)===String(profileId));
+    if(!p) return [];
+    const techs = Array.isArray(p._savedTechniques) ? p._savedTechniques : [];
+    // Also include weapons
+    const weapons = (p.weapons||[]).map(w=>{
+      const tier = w.rangeTier!=null ? Math.max(1,Math.min(8,Math.round(Number(w.rangeTier)||3))) : null;
+      return {
+        name: w.name||'سلاح',
+        description: w.notes||'',
+        _isWeapon: true,
+        finalSize: weaponRangeCells(w),          // النطاق يتبع إحصائية المدى لا رقماً ثابتاً
+        _rangeTierLabel: tier ? WEAPON_RANGE_TIER_LABELS[tier-1] : '',
+        diceStr: w.damage||w.dice||'',
+        Y: null,
+      };
+    });
+    return [...techs, ...weapons];
+  } catch(e){ return []; }
+}
+
+/* ═══════════════════════════════════════
+   ATTACK RANGE VISUALIZATION
+═══════════════════════════════════════ */
+let attackRangeLayer = null;
+
+let attackRangeState = null; // {tokId, r, cx, cy, svgEl, techName}
+
+function showAttackRange(tokId, rangeInCells, techName){
+  clearAttackRanges();
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+  const _r0 = parseFloat(rangeInCells);
+  const r = (isFinite(_r0) && _r0 > 0) ? Math.max(0.1, trunc1(_r0)) : 1;   // النطاق المرسوم = النطاق المعروض (مقتطع)
+  // نقطة التوكن (tok.x, tok.y) هي مركز دائرته بالضبط، فيُرسم النطاق من قلبها
+  const cx = tok.x, cy = tok.y;
+
+  attackRangeState = {tokId, r, cx, cy, techName: techName||''};
+  _drawAttackRange();
+  _highlightTokensInRange();
+}
+
+/* سحب النطاق (ماوس ولمس): مستمعات النافذة تُسجَّل مرة واحدة فقط (كانت تتراكم مع كل إعادة رسم) */
+let _rangeDrag = null;
+window.addEventListener('pointermove', e=>{
+  if(!_rangeDrag || !attackRangeState) return;
+  attackRangeState.cx = _rangeDrag.startCX + (e.clientX-_rangeDrag.startMX)/state.zoom;
+  attackRangeState.cy = _rangeDrag.startCY + (e.clientY-_rangeDrag.startMY)/state.zoom;
+  _drawAttackRange();
+  _highlightTokensInRange();
+});
+window.addEventListener('pointerup',     ()=>{ _rangeDrag = null; });
+window.addEventListener('pointercancel', ()=>{ _rangeDrag = null; });
+
+const _SVGNS = 'http://www.w3.org/2000/svg';
+function _svgEl(tag, attrs, style){
+  const e = document.createElementNS(_SVGNS, tag);
+  Object.keys(attrs||{}).forEach(k=>e.setAttribute(k, attrs[k]));
+  if(style) e.style.cssText = style;
+  return e;
+}
+
+function _drawAttackRange(){
+  if(!attackRangeState) return;
+  const {r, cx, cy, techName, tokId} = attackRangeState;
+  const px  = r * state.cellPx;
+  const inv = 1 / state.zoom;            // عناصر الواجهة تبقى بحجم ثابت على الشاشة مهما كان التكبير
+
+  if(attackRangeLayer) attackRangeLayer.remove();
+
+  const svg = _svgEl('svg', {width: state.mapW || 9999, height: state.mapH || 9999},
+    'position:absolute;top:0;left:0;overflow:visible;z-index:10;pointer-events:none;');
+
+  const defs = _svgEl('defs');
+  defs.innerHTML = `
+    <filter id="rng-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>`;
+
+  const glow = _svgEl('circle', {cx, cy, r:px+6, fill:'none', stroke:'rgba(239,68,68,0.4)', 'stroke-width':8, filter:'url(#rng-glow)'}, 'pointer-events:none;');
+
+  // الدائرة الرئيسية — تستقبل السحب عند لمس حدودها فقط
+  const circle = _svgEl('circle', {cx, cy, r:px, fill:'rgba(239,68,68,0.07)', stroke:'rgba(255,50,50,1)',
+    'stroke-width':2.5, 'stroke-dasharray':'8 4', filter:'url(#rng-glow)'}, 'pointer-events:stroke;cursor:move;touch-action:none;');
+
+  // نقطة المركز = قلب دائرة المهاجم
+  const dot = _svgEl('circle', {cx, cy, r:6*inv, fill:'rgba(255,80,80,0.9)'}, 'pointer-events:all;cursor:move;touch-action:none;');
+
+  const startDrag = e => {
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    _rangeDrag = {startMX:e.clientX, startMY:e.clientY, startCX:attackRangeState.cx, startCY:attackRangeState.cy};
+    e.stopPropagation(); e.preventDefault();
+  };
+  circle.addEventListener('pointerdown', startDrag);
+  dot.addEventListener('pointerdown', startDrag);
+
+  // ── أزرار أعلى النطاق: ⚔ العودة للهجمة | 💥 تطبيقها | ✕ إغلاق النطاق ──
+  const gy = cy - px - 24*inv;
+  const bar = _svgEl('g', {transform:`translate(${cx},${gy}) scale(${inv})`});
+  const mkBtn = (x, icon, fill, title, fn) => {
+    const g = _svgEl('g', {transform:`translate(${x},0)`}, 'pointer-events:all;cursor:pointer;');
+    g.appendChild(_svgEl('circle', {r:14, fill:'rgba(10,12,24,0.92)', stroke:fill, 'stroke-width':2}));
+    const tx = _svgEl('text', {x:0, y:1, fill:'#fff', 'font-size':14, 'font-weight':900, 'text-anchor':'middle', 'dominant-baseline':'middle'}, 'pointer-events:none;');
+    tx.textContent = icon;
+    const tt = _svgEl('title'); tt.textContent = title;
+    g.appendChild(tx); g.appendChild(tt);
+    ['pointerdown','mousedown','touchstart'].forEach(ev=>g.addEventListener(ev, e=>e.stopPropagation(), {passive:true}));
+    g.addEventListener('click', e=>{ e.stopPropagation(); fn(); });
+    return g;
+  };
+  bar.appendChild(mkBtn(-34, '⚔', '#f59e0b', 'العودة إلى الهجمة ومعلوماتها', returnToAttackFromRange));
+  bar.appendChild(mkBtn(  0, '💥', '#22c55e', 'تطبيق الهجمة على الأهداف داخل النطاق', applyAttackFromRange));
+  bar.appendChild(mkBtn( 34, '✕', '#ef4444', 'إغلاق النطاق', clearAttackRanges));
+
+  const label = _svgEl('text', {x:cx, y:gy - 22*inv, fill:'#ff6060', 'font-size':12*inv, 'font-weight':800,
+    'text-anchor':'middle', 'font-family':'inherit'}, 'pointer-events:none;');
+  label.textContent = techName || '';
+
+  const rangeLabel = _svgEl('text', {x:cx, y:cy + px + 16*inv, fill:'rgba(255,100,100,0.85)', 'font-size':10*inv,
+    'font-weight':700, 'text-anchor':'middle'}, 'pointer-events:none;');
+  rangeLabel.textContent = '← '+fmt1(r)+' خلية →';
+
+  [defs, glow, circle, dot, label, rangeLabel, bar].forEach(n=>svg.appendChild(n));
+  bfCanvas.appendChild(svg);
+  attackRangeLayer = svg;
+}
+
+/* ── من النطاق إلى الهجمة ── */
+function returnToAttackFromRange(){
+  if(!attackRangeState) return;
+  const el = document.getElementById('atk-launcher');
+  if(el){
+    el.style.display = '';
+    el.style.zIndex = nextDmgZ();
+    keepPopupInView(el);
+  } else {
+    openAttackLauncher(attackRangeState.tokId);
+    const rd = document.getElementById('atk-range'); if(rd) rd.value = attackRangeState.r;
+  }
+}
+function applyAttackFromRange(){
+  if(!attackRangeState) return;
+  if(!document.getElementById('atk-launcher')){
+    returnToAttackFromRange();
+    showToast('اضبط الضرر ثم اضغط «احسب الضرر» — الأهداف داخل النطاق تُختار تلقائياً');
+    return;
+  }
+  // إن لم تُحدَّد أهداف: كل من داخل النطاق عدا المهاجم نفسه
+  if(!window._atkTargets || window._atkTargets.size===0){
+    const inside = (_highlightTokensInRange()||[]).filter(t=>t.id!==attackRangeState.tokId);
+    window._atkTargets = new Set(inside.map(t=>t.id));
+    document.querySelectorAll('#atk-targets-wrap .target-chip').forEach(c=>c.classList.remove('selected'));
+    inside.forEach(t=>document.getElementById('target-'+t.id)?.classList.add('selected'));
+  }
+  if(window._atkTargets.size===0){
+    returnToAttackFromRange();
+    showToast('⚠ لا توجد شخصيات داخل النطاق');
+    return;
+  }
+  const dmg  = parseFloat(document.getElementById('atk-dmg')?.value)||0;
+  const tdmg = parseFloat(document.getElementById('atk-true-dmg')?.value)||0;
+  if(!dmg && !tdmg){
+    returnToAttackFromRange();
+    showToast('أدخل قيمة الضرر ثم اضغط «احسب الضرر»');
+    return;
+  }
+  launchDamageCalc();
+}
+
+function _highlightTokensInRange(){
+  if(!attackRangeState) return;
+  const {cx, cy, r} = attackRangeState;
+  const rangePx = r * state.cellPx;
+  // find tokens whose center is within range
+  const inRange = state.tokens.filter(t=>{
+    return Math.sqrt((t.x-cx)**2+(t.y-cy)**2) <= rangePx;
+  });
+  // flash tokens in range
+  document.querySelectorAll('.token').forEach(el=>{
+    const id = el.id.replace('tok_','');
+    const hit = inRange.some(t=>t.id===id);
+    const av = el.querySelector('.token-avatar') || el;
+    av.style.outline = hit ? '3px solid #ef4444' : '';
+    av.style.filter  = hit ? 'drop-shadow(0 0 8px #ef4444)' : '';
+  });
+  return inRange;
+}
+
+function clearAttackRanges(){
+  if(attackRangeLayer){ attackRangeLayer.remove(); attackRangeLayer=null; }
+  attackRangeState = null;
+  _rangeDrag = null;
+  document.querySelectorAll('.token').forEach(el=>{
+    const av = el.querySelector('.token-avatar') || el;
+    av.style.outline=''; av.style.filter='';
+  });
+}
+
+function previewAttackRange(tokId, val){
+  if(attackRangeState) showAttackRange(tokId, val, attackRangeState.techName);
+}
+
+function setCustomDef(tokId, key, val){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+  tok[key] = trunc1(parseFloat(val)||0);
+  saveBfState();
+}
+
+function loadTransformForToken(tokId, transformId){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+  tok._activeTransformId = transformId || null;
+  if(transformId){
+    const tp = getProfileById(transformId);
+    if(tp){
+      tok.hp = tp.hp || tok.hp;
+      tok.hpMax = tp.hpMax || tok.hpMax;
+      tok.hala = tp.hala || tok.hala;
+      tok.halaMax = tp.halaMax || tok.halaMax;
+      tok.defense = tp.defense || tok.defense;
+      tok.trueDefense = tp.trueDefense || tok.trueDefense;
+      tok.dmgReduce = tp.dmgReduce || tok.dmgReduce;
+      tok.immunity = tp.immunity || tok.immunity;
+      tok.physStrPct = tp.physStrPct || tok.physStrPct;
+      tok.charSize = tp.size || tok.charSize;
+    }
+  }
+  renderTokens();
+  saveBfState();
+  closePopup(tokId);
+  openBattlePopup(tokId);
+}
+
+function getStat(profile, name){
+  if(!profile.stats) return 0;
+  const s = profile.stats.find(s=>s.name===name);
+  return s ? (s.value||0) : 0;
+}
+
+/* ═══════════════════════════════════════
+   RACE COLORS (matches amazad.html)
+═══════════════════════════════════════ */
+const RC={
+  "إنسان":"#c8a96e","سكارد":"#a78bfa","آلزاداكايند":"#f97316","إتشيرما":"#38bdf8",
+  "سيلافين":"#e879f9","بهائم الظلام":"#dc2626","وحش الظلام":"#991b1b",
+  "ساروفيان":"#2dd4bf","ساروفيان خرافي":"#06b6d4","رؤوس الكلاب":"#a3a3a3","حيوان":"#84cc16",
+};
+
+/* ═══════════════════════════════════════
+   PAN & ZOOM
+═══════════════════════════════════════ */
+function setupPanZoom(){
+  // Mouse
+  bfWrap.addEventListener('mousedown', onPanStart);
+  window.addEventListener('mousemove', onPanMove);
+  window.addEventListener('mouseup',   onPanEnd);
+
+  // Touch
+  let lastTouchDist = 0;
+  bfWrap.addEventListener('touchstart', e=>{
+    if(e.touches.length===1){
+      onPanStart(e.touches[0]);
+    } else if(e.touches.length===2){
+      lastTouchDist = getTouchDist(e.touches);
+    }
+  },{passive:false});
+  bfWrap.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    if(e.touches.length===1){
+      onPanMove(e.touches[0]);
+    } else if(e.touches.length===2){
+      const dist = getTouchDist(e.touches);
+      if(lastTouchDist>0){
+        const delta = (dist - lastTouchDist) * 0.005;
+        const rect2 = bfWrap.getBoundingClientRect();
+        const cx = ((e.touches[0].clientX + e.touches[1].clientX)/2) - rect2.left;
+        const cy = ((e.touches[0].clientY + e.touches[1].clientY)/2) - rect2.top;
+        const mapCX = (cx - state.pan.x) / state.zoom;
+        const mapCY = (cy - state.pan.y) / state.zoom;
+        const minZ2 = Math.min(rect2.width/(state.mapW||rect2.width), rect2.height/(state.mapH||rect2.height))*0.3;
+        state.zoom = Math.max(minZ2, Math.min(3.0, state.zoom + delta));
+        state.pan.x = cx - mapCX * state.zoom;
+        state.pan.y = cy - mapCY * state.zoom;
+        applyTransform();
+      }
+      lastTouchDist = dist;
+    }
+  },{passive:false});
+  bfWrap.addEventListener('touchend', e=>{ onPanEnd(); lastTouchDist=0; });
+
+  // Wheel zoom — toward cursor
+  bfWrap.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.909;
+    const rect = bfWrap.getBoundingClientRect();
+    applyZoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
+    saveBfState();
+  },{passive:false});
+
+  // Click outside tokens deselects
+  bfWrap.addEventListener('click', e=>{
+    if(e.target===bfWrap || e.target===bfCanvas || e.target===mapImg || e.target===gridCanvas || e.target===document.getElementById('grid-svg')){
+      selectToken(null);
+      closeAllPopups();
+    }
+  });
+}
+
+function getTouchDist(touches){
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function applyZoomAt(px, py, factor){
+  const minZ = getMinZoom();
+  const newZ = Math.max(minZ, Math.min(5, state.zoom * factor));
+  state.pan.x = px - (px - state.pan.x) * (newZ / state.zoom);
+  state.pan.y = py - (py - state.pan.y) * (newZ / state.zoom);
+  state.zoom  = newZ;
+  applyTransform();
+}
+function getMinZoom(){
+  if(!state.mapW||!state.mapH) return 0.03;
+  // allow zoom-out until map appears at 1/3 of viewport
+  const wz = bfWrap.clientWidth  / state.mapW / 3;
+  const hz = bfWrap.clientHeight / state.mapH / 3;
+  return Math.min(wz, hz, 0.03);
+}
+
+function onPanStart(e){
+  if(state.tool !== 'move') return;
+  isPanning = true;
+  bfWrap.classList.add('panning');
+  panStart = {x: e.clientX||e.pageX, y: e.clientY||e.pageY};
+  panOrigin = {...state.pan};
+}
+function onPanMove(e){
+  if(!isPanning) return;
+  const cx = e.clientX||e.pageX||0;
+  const cy = e.clientY||e.pageY||0;
+  const sens = state.panSensitivity || 1.0;
+  state.pan.x = panOrigin.x + (cx - panStart.x) * sens;
+  state.pan.y = panOrigin.y + (cy - panStart.y) * sens;
+  applyTransform();
+  const rect = bfWrap.getBoundingClientRect();
+  updateCoord(cx - rect.left, cy - rect.top);
+}
+function onPanEnd(){
+  if(isPanning){ isPanning=false; bfWrap.classList.remove('panning'); saveBfState(); }
+}
+
+function updateCoord(clientX, clientY){
+  if(!state.mapSrc){ document.getElementById('coord-display').textContent='—'; return; }
+  const mapX = (clientX - state.pan.x) / state.zoom;
+  const mapY = (clientY - state.pan.y) / state.zoom;
+  const col  = Math.floor(mapX / state.cellPx);
+  const row  = Math.floor(mapY / state.cellPx);
+  document.getElementById('coord-display').textContent = `عمود ${col} — صف ${row}`;
+}
+
+function zoomIn(){
+  const cx=bfWrap.clientWidth/2, cy=bfWrap.clientHeight/2;
+  applyZoomAt(cx,cy,1.2); saveBfState();
+}
+function zoomOut(){
+  const cx=bfWrap.clientWidth/2, cy=bfWrap.clientHeight/2;
+  applyZoomAt(cx,cy,1/1.2); saveBfState();
+}
+/* ⊞ — fit map exactly in viewport */
+function zoomFit(){
+  if(!state.mapW||!state.mapH){zoomReset();return;}
+  const zw = bfWrap.clientWidth  / state.mapW;
+  const zh = bfWrap.clientHeight / state.mapH;
+  state.zoom = Math.min(zw,zh) * 0.96;
+  state.pan.x = (bfWrap.clientWidth  - state.mapW * state.zoom) / 2;
+  state.pan.y = (bfWrap.clientHeight - state.mapH * state.zoom) / 2;
+  applyTransform(); saveBfState();
+}
+/* ⊙ — reset to 1:1 centered */
+function zoomReset(){
+  state.zoom=1;
+  if(state.mapW&&state.mapH){
+    state.pan.x = Math.max(0, (bfWrap.clientWidth  - state.mapW)/2);
+    state.pan.y = Math.max(0, (bfWrap.clientHeight - state.mapH)/2);
+  } else {
+    state.pan={x:0,y:0};
+  }
+  applyTransform(); saveBfState();
+}
+
+/* ═══════════════════════════════════════
+   TOOL SELECTION
+═══════════════════════════════════════ */
+function setTool(t){
+  state.tool = t;
+  document.querySelectorAll('.tool-btn[id^=tool-]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tool-'+t)?.classList.add('active');
+}
+
+function toggleGrid(){
+  state.gridVis = !state.gridVis;
+  const btn = document.getElementById('grid-toggle');
+  btn.textContent = state.gridVis ? '▦ إخفاء' : '▦ إظهار';
+  renderGrid();
+  saveBfState();
+}
+
+/* ═══════════════════════════════════════
+   TOKEN DRAG
+═══════════════════════════════════════ */
+let tokenDragging = false;
+let dragTokId = null;
+let dragStartMouse = {x:0,y:0};
+let dragStartPos   = {x:0,y:0};
+
+function startTokenDrag(e, tokId){
+  e.stopPropagation();
+  const ev = e.touches ? e.touches[0] : e;
+  tokenDragging = true;
+  dragTokId = tokId;
+  dragStartMouse = {x: ev.clientX, y: ev.clientY};
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(tok) dragStartPos = {x: tok.x, y: tok.y};
+  selectToken(tokId);
+
+  const onMove = ev2 => {
+    if(!tokenDragging) return;
+    const e2 = ev2.touches ? ev2.touches[0] : ev2;
+    const dx = (e2.clientX - dragStartMouse.x) / state.zoom;
+    const dy = (e2.clientY - dragStartMouse.y) / state.zoom;
+    const tok2 = state.tokens.find(t=>t.id===dragTokId);
+    if(!tok2) return;
+    tok2.x = dragStartPos.x + dx;
+    tok2.y = dragStartPos.y + dy;
+    const el = document.getElementById('tok_'+dragTokId);
+    if(el){ el.style.left = tok2.x+'px'; el.style.top = tok2.y+'px'; }
+  };
+  const onEnd = () => {
+    if(!tokenDragging) return;
+    tokenDragging = false;
+    // snap to grid center
+    snapTokenToGrid(dragTokId);
+    saveBfState();
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onEnd);
+    window.removeEventListener('touchmove', onMove);
+    window.removeEventListener('touchend', onEnd);
+    dragTokId = null;
+  };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onEnd);
+  window.addEventListener('touchmove', onMove, {passive:false});
+  window.addEventListener('touchend', onEnd);
+}
+
+function snapTokenToGrid(tokId){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+  const col = Math.round(tok.x / state.cellPx);
+  const row = Math.round(tok.y / state.cellPx);
+  tok.x = col * state.cellPx;
+  tok.y = row * state.cellPx;
+  const el = document.getElementById('tok_'+tokId);
+  if(el){ el.style.left = tok.x+'px'; el.style.top = tok.y+'px'; }
+}
+
+function moveToken(tokId, dCol, dRow){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+  tok.x += dCol * state.cellPx;
+  tok.y += dRow * state.cellPx;
+  tok.x = Math.max(0, Math.min(state.mapW-1, tok.x));
+  tok.y = Math.max(0, Math.min(state.mapH-1, tok.y));
+  const el = document.getElementById('tok_'+tokId);
+  if(el){ el.style.left = tok.x+'px'; el.style.top = tok.y+'px'; }
+  saveBfState();
+  // refresh popup position
+  if(battlePopupOpen && selectedTokenId===tokId){
+    openBattlePopup(tokId, el);
+  }
+}
+
+/* ═══════════════════════════════════════
+   SELECT TOKEN
+═══════════════════════════════════════ */
+function selectToken(id){
+  selectedTokenId = id;
+  document.querySelectorAll('.token').forEach(el=>{
+    el.classList.toggle('selected', el.id==='tok_'+id);
+  });
+}
+
+/* ═══════════════════════════════════════
+   BATTLE POPUPS — multiple, draggable
+═══════════════════════════════════════ */
+function openBattlePopup(tokId){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+  selectToken(tokId);
+
+  // if already open, just focus/flash it
+  if(openPopups[tokId]){
+    openPopups[tokId].el.style.zIndex = nextPopupZ();
+    openPopups[tokId].el.style.boxShadow = '0 0 0 2px var(--accent),0 8px 32px #000';
+    setTimeout(()=>{ if(openPopups[tokId]) openPopups[tokId].el.style.boxShadow='0 8px 32px #000000cc'; }, 600);
+    return;
+  }
+
+  const imgSrc   = getCharImage(tok.profileId);
+  const rc       = tok.raceColor || '#7c3aed';
+  const hpPct    = tok.hpMax>0  ? Math.max(0,Math.min(100,(tok.hp/tok.hpMax)*100))      : 0;
+  const halaPct  = tok.halaMax>0? Math.max(0,Math.min(100,(tok.hala/tok.halaMax)*100))   : 0;
+  const stPct    = tok.staminaMax>0?Math.max(0,Math.min(100,(tok.stamina/tok.staminaMax)*100)):0;
+  const hpColor  = hpPct>60?'#22c55e':hpPct>30?'#f59e0b':'#ef4444';
+  const techniques = getTechniques(tok.profileId);
+
+  const el = document.createElement('div');
+  el.className = 'battle-popup';
+  el.dataset.tokId = tokId;
+  el.style.zIndex = nextPopupZ();
+
+  // place near center of screen initially
+  const sw = window.innerWidth, sh = window.innerHeight;
+  const pw = 270;
+  el.style.left = Math.min(sw - pw - 10, Math.max(10, sw/2 - pw/2 + Object.keys(openPopups).length * 20)) + 'px';
+  el.style.top  = Math.max(60, sh/2 - 230 + Object.keys(openPopups).length * 20) + 'px';
+
+  let techHTML = '';
+  if(techniques.length > 0){
+    techHTML = `
+      <div style="font-size:10px;color:var(--muted);font-weight:700;margin:10px 0 5px;">⚡ التقنيات المحفوظة (${techniques.length})</div>
+      <div class="bp-tech-list" id="tech-list-${tokId}">
+        ${techniques.map((t,i)=>{
+        const techSize = techRangeCells(t);
+        const rangeStr = techSize ? fmt1(techSize) + ' خلية' + (t._rangeTierLabel?' ('+t._rangeTierLabel+')':'') : '';
+        return `
+          <div class="bp-tech-item" onclick="toggleTech(this)">
+            <div class="bp-tech-name">${t.name||'تقنية '+(i+1)}${t._isWeapon?' 🗡':''}</div>
+            <div class="bp-tech-sub">
+              ${t.diceStr?'نرد: '+t.diceStr+' • ':''} 
+              ${t.Y?'Y='+parseFloat(t.Y).toFixed(2)+' • ':''}
+              ${rangeStr?'<span style="color:#ef4444">نطاق: '+rangeStr+'</span>':''}
+            </div>
+            ${rangeStr?`<button onclick="event.stopPropagation();showAttackRange('${tokId}',${techSize},'${(t.name||'').replace(/'/g,'')}')" style="font-size:8px;background:#ef444422;border:1px solid #ef444444;color:#ef4444;border-radius:4px;padding:1px 7px;cursor:pointer;margin-top:3px;">🎯 عرض النطاق</button>`:''}
+            <div class="bp-tech-desc">${t.description||t.notes||t.content||'—'}</div>
+          </div>
+        `;
+      }).join('')}
+      </div>
+    `;
+  } else {
+    techHTML = `<div style="font-size:10px;color:var(--muted2);margin-top:8px;text-align:center;">لا توجد تقنيات محفوظة</div>`;
+  }
+
+  // بناء رابط الشخصية
+  const profileUrl = `amazad.html?char=${encodeURIComponent(tok.profileId||'')}`;
+
+  el.innerHTML = `
+    <!-- شريط التحجيم في الأعلى -->
+    <div class="bp-resize-bar" id="resize-bar-${tokId}"></div>
+    <span class="bp-size-badge" id="size-badge-${tokId}">270px</span>
+
+    <div class="bp-drag-bar" id="drag-bar-${tokId}" style="margin-top:6px;">
+      <div class="bp-drag-handle"></div>
+    </div>
+    <button class="bp-close" onclick="closePopup('${tokId}')">×</button>
+
+    <div class="bp-body">
+
+    <div class="bp-header">
+      <div class="bp-avatar" style="border-color:${rc}">
+        ${imgSrc?`<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;">`:(tok.emoji||'⚔')}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div class="bp-name" style="color:${rc}">${tok.name||'—'}</div>
+        <div class="bp-sub">${tok.race||''} • Lv.${tok.level||1}</div>
+        <div class="bp-sub">حجم: ${fmt1(tok.charSize||100)} → ${fmt1((tok.charSize||100)/100)}× خلية</div>
+      </div>
+    </div>
+
+    <!-- التحولات المتاحة -->
+    ${(()=>{
+      const transforms = getProfileTransforms(tok.profileId);
+      if(!transforms.length) return '';
+      return `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
+        <button onclick="loadTransformForToken('${tokId}', null)"
+          style="font-size:8px;padding:2px 8px;border-radius:4px;cursor:pointer;font-family:inherit;
+          border:1px solid ${!tok._activeTransformId?rc+'99':'#374151'};
+          background:${!tok._activeTransformId?rc+'22':'transparent'};color:${!tok._activeTransformId?rc:'#6b7280'};">
+          ◉ الأساس
+        </button>
+        ${transforms.map(t=>`
+          <button onclick="loadTransformForToken('${tokId}', '${t.id}')"
+            style="font-size:8px;padding:2px 8px;border-radius:4px;cursor:pointer;font-family:inherit;
+            border:1px solid ${String(tok._activeTransformId)===String(t.id)?'#a78bfa99':'#374151'};
+            background:${String(tok._activeTransformId)===String(t.id)?'#a78bfa22':'transparent'};
+            color:${String(tok._activeTransformId)===String(t.id)?'#a78bfa':'#6b7280'};">
+            ⟳ ${t.label}
+          </button>
+        `).join('')}
+      </div>`;
+    })()}
+
+    <div class="bp-stat-row">
+      <span class="bp-stat-label">❤ HP</span>
+      <div class="bp-bar-wrap" onclick="editStat('${tokId}','hp')">
+        <div class="bp-bar" id="bp-hp-bar-${tokId}" style="width:${hpPct}%;background:${hpColor};"></div>
+      </div>
+      <span class="bp-val" id="bp-hp-val-${tokId}" onclick="editStat('${tokId}','hp')" style="cursor:pointer;">${bpValHTML(tok.hp,tok.hpMax)}</span>
+    </div>
+    <div class="bp-stat-row">
+      <span class="bp-stat-label">✨ هالة</span>
+      <div class="bp-bar-wrap" onclick="editStat('${tokId}','hala')">
+        <div class="bp-bar" id="bp-hala-bar-${tokId}" style="width:${halaPct}%;background:#a855f7;"></div>
+      </div>
+      <span class="bp-val" id="bp-hala-val-${tokId}" onclick="editStat('${tokId}','hala')" style="cursor:pointer;">${bpValHTML(tok.hala,tok.halaMax)}</span>
+    </div>
+    <div class="bp-stat-row">
+      <span class="bp-stat-label">⚡ ستامينا</span>
+      <div class="bp-bar-wrap" onclick="editStat('${tokId}','stamina')">
+        <div class="bp-bar" id="bp-sta-bar-${tokId}" style="width:${stPct}%;background:#f59e0b;"></div>
+      </div>
+      <span class="bp-val" id="bp-sta-val-${tokId}" onclick="editStat('${tokId}','stamina')" style="cursor:pointer;">${bpValHTML(tok.stamina,tok.staminaMax)}</span>
+    </div>
+
+    <!-- إحصائيات قتالية كاملة -->
+    ${(()=>{
+      const sd = getSideDefenses(tok);
+      return `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;">
+        <div style="background:var(--bg3);border-radius:6px;padding:6px;text-align:center;">
+          <div style="font-size:8px;color:var(--muted)">🛡 دفاع</div>
+          <div style="font-size:13px;font-weight:800;color:#60a5fa">${sd.defense}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:6px;padding:6px;text-align:center;">
+          <div style="font-size:8px;color:var(--muted)">⚔ دفاع حقيقي</div>
+          <div style="font-size:13px;font-weight:800;color:#f59e0b">${sd.trueDef}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:6px;padding:6px;text-align:center;">
+          <div style="font-size:8px;color:var(--muted)">🔰 دفاع٪</div>
+          <div style="font-size:13px;font-weight:800;color:#22d3ee">${sd.base}٪</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:6px;padding:6px;text-align:center;">
+          <div style="font-size:8px;color:var(--muted)">🧿 مناعة</div>
+          <div style="font-size:13px;font-weight:800;color:#a78bfa">${tok.immunity||0}</div>
+        </div>
+        ${sd.side1>0?`
+        <div style="background:#f59e0b0a;border:1px solid #f59e0b33;border-radius:6px;padding:6px;text-align:center;">
+          <div style="font-size:8px;color:#f59e0b">🛡 جانبي①${sd.isGrade5?' (V)':''}</div>
+          <div style="font-size:13px;font-weight:800;color:#f59e0b">${sd.side1}٪</div>
+        </div>`:''}
+        ${sd.side2>0?`
+        <div style="background:${sd.isGrade5?'#f9741608':'#22c55e0a'};border:1px solid ${sd.isGrade5?'#f9741633':'#22c55e33'};border-radius:6px;padding:6px;text-align:center;">
+          <div style="font-size:8px;color:${sd.isGrade5?'#f97416':'#22c55e'}">${sd.isGrade5?'🛡 جانبي②':'🌿 جانبي②'}</div>
+          <div style="font-size:13px;font-weight:800;color:${sd.isGrade5?'#f97416':'#22c55e'}">${sd.side2}٪</div>
+        </div>`:''}
+        ${sd.side3>0?`
+        <div style="background:#22c55e0a;border:1px solid #22c55e33;border-radius:6px;padding:6px;text-align:center;">
+          <div style="font-size:8px;color:#22c55e">🌿 جانبي③</div>
+          <div style="font-size:13px;font-weight:800;color:#22c55e">${sd.side3}٪</div>
+        </div>`:''}
+        ${tok.physStrPct>0?`<div style="background:var(--bg3);border-radius:6px;padding:6px;text-align:center;"><div style="font-size:8px;color:var(--muted)">💪 قوة جسدية</div><div style="font-size:13px;font-weight:800;color:#f97316">${tok.physStrPct||0}٪</div></div>`:''}
+      </div>
+
+      <!-- فرص: الحظ / الحاسة السادسة / التجدد / الأعين -->
+      <div id="chances-${tokId}">${renderChancesHTML(tok)}</div>
+
+      <!-- بارات الصحة الإضافية -->
+      ${(tok.extraBars||[]).length>0?`
+      <div style="margin-top:8px;background:var(--bg3);border-radius:6px;padding:8px;">
+        <div style="font-size:9px;color:var(--muted);font-weight:700;margin-bottom:6px;">❤ بارات الصحة الإضافية</div>
+        ${(tok.extraBars||[]).map((bar,bi)=>{
+          const pct = bar.max>0 ? Math.max(0,Math.min(100,(bar.current??bar.max)/(bar.max)*100)) : 0;
+          return `
+          <div style="margin-bottom:5px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+              <span style="font-size:9px;color:${bar.color||'#f97316'}">${bar.label||'بار إضافي'}</span>
+              <div style="display:flex;gap:3px;align-items:center;">
+                <button onclick="adjustExtraBar('${tokId}',${bi},-10)" style="padding:0 4px;background:transparent;border:1px solid #374151;border-radius:3px;color:var(--muted);font-size:10px;cursor:pointer;">−</button>
+                <span style="font-size:10px;color:${bar.color||'#f97316'};font-weight:700;">${fmt1(bar.current??bar.max??0)}/${fmt1(bar.max||0)} <span style="opacity:.7;font-size:9px;">${Math.floor(pct)}%</span></span>
+                <button onclick="adjustExtraBar('${tokId}',${bi},10)" style="padding:0 4px;background:transparent;border:1px solid #374151;border-radius:3px;color:var(--muted);font-size:10px;cursor:pointer;">+</button>
+              </div>
+            </div>
+            <div style="height:4px;background:#131720;border-radius:2px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${bar.color||'#f97316'};border-radius:2px;transition:width .3s;"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`:''}
+
+      <!-- دفاعات مخصصة قابلة للتعديل -->
+      <div style="margin-top:8px;background:var(--bg3);border-radius:6px;padding:8px;">
+        <div style="font-size:9px;color:var(--muted);font-weight:700;margin-bottom:6px;">⚙ دفاعات مخصصة (تعديل يدوي)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+          <div>
+            <div style="font-size:7px;color:#22d3ee;margin-bottom:2px;">دفاع٪ إضافي</div>
+            <input type="number" value="${tok._extraDmgReduce||0}" min="-100" max="100"
+              onchange="setCustomDef('${tokId}','_extraDmgReduce',this.value)"
+              style="width:100%;background:#0a0c14;border:1px solid #22d3ee33;border-radius:4px;
+              color:#22d3ee;font-size:11px;padding:3px;text-align:center;font-weight:700;">
+          </div>
+          <div>
+            <div style="font-size:7px;color:#60a5fa;margin-bottom:2px;">دفاع إضافي</div>
+            <input type="number" value="${tok._extraDefense||0}" min="-999" max="9999"
+              onchange="setCustomDef('${tokId}','_extraDefense',this.value)"
+              style="width:100%;background:#0a0c14;border:1px solid #60a5fa33;border-radius:4px;
+              color:#60a5fa;font-size:11px;padding:3px;text-align:center;font-weight:700;">
+          </div>
+          <div>
+            <div style="font-size:7px;color:#f59e0b;margin-bottom:2px;">دفاع حقيقي+</div>
+            <input type="number" value="${tok._extraTrueDef||0}" min="-999" max="9999"
+              onchange="setCustomDef('${tokId}','_extraTrueDef',this.value)"
+              style="width:100%;background:#0a0c14;border:1px solid #f59e0b33;border-radius:4px;
+              color:#f59e0b;font-size:11px;padding:3px;text-align:center;font-weight:700;">
+          </div>
+        </div>
+      </div>`;
+    })()}
+
+    <!-- هجوم مخصص -->
+    <div style="margin-top:10px;">
+      <div style="font-size:10px;color:var(--muted);font-weight:700;margin-bottom:5px;">🎯 نطاق هجوم مخصص</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <input type="number" id="custom-range-${tokId}" min="0.5" max="50" step="0.5" value="1"
+          style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;
+          color:var(--text);font-size:11px;padding:3px 6px;text-align:center;"
+          oninput="previewAttackRange('${tokId}', this.value)">
+        <span style="font-size:9px;color:var(--muted)">مربع</span>
+        <button onclick="showAttackRange('${tokId}', document.getElementById('custom-range-${tokId}').value)"
+          style="font-size:9px;background:#ef444422;border:1px solid #ef444444;color:#ef4444;
+          border-radius:5px;padding:3px 9px;cursor:pointer;">عرض النطاق</button>
+        <button onclick="clearAttackRanges()"
+          style="font-size:9px;background:transparent;border:1px solid var(--border);color:var(--muted);
+          border-radius:5px;padding:3px 9px;cursor:pointer;">مسح</button>
+      </div>
+    </div>
+
+    ${techHTML}
+
+    <div class="bp-actions" style="margin-top:10px;">
+      <button class="bp-action-btn" onclick="uploadTokenImg('${tokId}')">📷 صورة</button>
+      <button class="bp-action-btn" onclick="syncFromProfile('${tokId}')">🔄 مزامنة</button>
+      <button class="bp-action-btn" onclick="resetStats('${tokId}')">♻ إعادة</button>
+      <button class="bp-action-btn" style="color:#ef4444;border-color:#ef444444;" onclick="removeToken('${tokId}')">🗑 إزالة</button>
+    </div>
+
+    <a class="bp-profile-link" href="${profileUrl}" target="_blank">
+      📋 فتح بروفايل الشخصية الكامل
+      <span style="font-size:9px;opacity:0.6;">↗</span>
+    </a>
+
+    <div style="font-size:9px;color:var(--muted2);text-align:center;margin-top:4px;opacity:0.5;direction:ltr;">
+      ${profileUrl.slice(0,40)}…
+    </div>
+    </div>
+  `;
+
+  document.getElementById('battle-popups-layer').appendChild(el);
+  openPopups[tokId] = { el };
+  makeDraggableEl(el, document.getElementById('drag-bar-'+tokId));
+  makeResizableEl(el, document.getElementById('resize-bar-'+tokId), document.getElementById('size-badge-'+tokId));
+  keepPopupInView(el);
+}
+
+let _popupZCounter = 500;
+function nextPopupZ(){ return ++_popupZCounter; }
+
+function toggleTech(el){
+  el.classList.toggle('open');
+}
+
+function closePopup(tokId){
+  if(openPopups[tokId]){
+    openPopups[tokId].el.remove();
+    delete openPopups[tokId];
+  }
+}
+
+function closeAllPopups(){
+  Object.keys(openPopups).forEach(id=>closePopup(id));
+}
+
+function refreshPopupBars(tokId){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok || !openPopups[tokId]) return;
+  const hpPct   = tok.hpMax>0   ? Math.max(0,Math.min(100,(tok.hp/tok.hpMax)*100))        : 0;
+  const halaPct = tok.halaMax>0  ? Math.max(0,Math.min(100,(tok.hala/tok.halaMax)*100))     : 0;
+  const stPct   = tok.staminaMax>0?Math.max(0,Math.min(100,(tok.stamina/tok.staminaMax)*100)):0;
+  const hpColor = hpPct>60?'#22c55e':hpPct>30?'#f59e0b':'#ef4444';
+  const hpBar   = document.getElementById('bp-hp-bar-'+tokId);
+  const hpVal   = document.getElementById('bp-hp-val-'+tokId);
+  const haBar   = document.getElementById('bp-hala-bar-'+tokId);
+  const haVal   = document.getElementById('bp-hala-val-'+tokId);
+  const stBar   = document.getElementById('bp-sta-bar-'+tokId);
+  const stVal   = document.getElementById('bp-sta-val-'+tokId);
+  if(hpBar){ hpBar.style.width=hpPct+'%'; hpBar.style.background=hpColor; }
+  if(hpVal) hpVal.innerHTML = bpValHTML(tok.hp, tok.hpMax);
+  if(haBar) haBar.style.width=halaPct+'%';
+  if(haVal) haVal.innerHTML = bpValHTML(tok.hala, tok.halaMax);
+  if(stBar) stBar.style.width=stPct+'%';
+  if(stVal) stVal.innerHTML = bpValHTML(tok.stamina, tok.staminaMax);
+}
+
+/* ═══════════════════════════════════════
+   STAT EDITING
+═══════════════════════════════════════ */
+function editStat(tokId, stat){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+
+  const labels = {hp:'❤ الصحة', hala:'✨ الهالة', stamina:'⚡ الستامينا'};
+  const colors  = {hp:'#ef4444', hala:'#a855f7', stamina:'#f59e0b'};
+  const maxKey  = stat+'Max';
+  const cur = tok[stat]??0;
+  const max = tok[maxKey]??100;
+
+  openModal(`
+    <span class="modal-handle"></span>
+    <div class="modal-title" style="color:${colors[stat]}">${labels[stat]}</div>
+    <div class="se-row">
+      <span class="se-label">الحالي</span>
+      <div class="se-input-wrap">
+        <button class="se-btn" onclick="adjustStat('${tokId}','${stat}',-1)">−</button>
+        <div class="se-val" id="se-cur">${fmt1(cur)}</div>
+        <button class="se-btn" onclick="adjustStat('${tokId}','${stat}',1)">+</button>
+      </div>
+      <span class="se-max" id="se-maxlabel">/ ${fmt1(max)}</span>
+    </div>
+    <div class="se-row">
+      <span class="se-label">الأقصى</span>
+      <div class="se-input-wrap">
+        <button class="se-btn" onclick="adjustStat('${tokId}','${maxKey}',-1)">−</button>
+        <div class="se-val" id="se-max">${fmt1(max)}</div>
+        <button class="se-btn" onclick="adjustStat('${tokId}','${maxKey}',1)">+</button>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);font-weight:700;margin:12px 0 5px;">تعديل سريع للحالي</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="se-btn" style="flex:1;font-size:11px;color:var(--muted);" onclick="adjustStat('${tokId}','${stat}',-10)">−10</button>
+      <button class="se-btn" style="flex:1;font-size:11px;color:var(--muted);" onclick="adjustStat('${tokId}','${stat}',10)">+10</button>
+      <button class="se-btn" style="flex:1;font-size:11px;color:var(--muted);" onclick="adjustStat('${tokId}','${stat}',-50)">−50</button>
+      <button class="se-btn" style="flex:1;font-size:11px;color:var(--muted);" onclick="adjustStat('${tokId}','${stat}',50)">+50</button>
+    </div>
+    <div style="font-size:10px;color:var(--muted);font-weight:700;margin:12px 0 5px;">تعديل سريع للأقصى</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="se-btn" style="flex:1;font-size:11px;color:var(--muted);" onclick="adjustStat('${tokId}','${maxKey}',-100)">−100</button>
+      <button class="se-btn" style="flex:1;font-size:11px;color:var(--muted);" onclick="adjustStat('${tokId}','${maxKey}',-10)">−10</button>
+      <button class="se-btn" style="flex:1;font-size:11px;color:var(--muted);" onclick="adjustStat('${tokId}','${maxKey}',10)">+10</button>
+      <button class="se-btn" style="flex:1;font-size:11px;color:var(--muted);" onclick="adjustStat('${tokId}','${maxKey}',100)">+100</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" style="flex:1" onclick="closeModal();openBattlePopup('${tokId}',null)">حفظ</button>
+    </div>
+  `);
+  window._editStatTokId = tokId;
+  window._editStatKey   = stat;
+}
+
+function adjustStat(tokId, key, delta){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+  const isMax = key.endsWith('Max');
+  const base  = isMax ? key.slice(0,-3) : key;
+  tok[key] = trunc1(Math.max(isMax ? 1 : 0, (tok[key]??0) + delta));
+  // الحالية لا تتجاوز الأقصى أبداً (وعند إنقاص الأقصى تنزل الحالية معه)
+  if(tok[base+'Max'] !== undefined) tok[base] = trunc1(Math.min(tok[base]??0, tok[base+'Max']));
+  const curEl = document.getElementById('se-cur');
+  const maxEl = document.getElementById('se-max');
+  const maxLbl = document.getElementById('se-maxlabel');
+  if(curEl) curEl.textContent = fmt1(tok[base]);
+  if(maxEl) maxEl.textContent = fmt1(tok[base+'Max']);
+  if(maxLbl) maxLbl.textContent = '/ ' + fmt1(tok[base+'Max']);
+  // re-render token bar
+  const el = document.getElementById('tok_'+tokId);
+  if(el){ el.remove(); renderToken(tok); }
+  // refresh open popup bars live
+  refreshPopupBars(tokId);
+  saveBfState();
+}
+
+function adjustExtraBar(tokId, barIdx, delta){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok || !tok.extraBars || !tok.extraBars[barIdx]) return;
+  const bar = tok.extraBars[barIdx];
+  bar.current = trunc1(Math.max(0, Math.min(bar.max||0, (bar.current??bar.max??0) + delta)));
+  const el = document.getElementById('tok_'+tokId);
+  if(el){ el.remove(); renderToken(tok); }
+  if(openPopups[tokId]){ closePopup(tokId); openBattlePopup(tokId); }
+  saveBfState();
+}
+
+function resetStats(tokId){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+  tok.hp     = tok.hpMax;
+  tok.hala   = tok.halaMax;
+  tok.stamina= tok.staminaMax;
+  const el = document.getElementById('tok_'+tokId);
+  if(el){ el.remove(); renderToken(tok); }
+  refreshPopupBars(tokId);
+  showToast('♻ تمت إعادة الإحصائيات');
+  saveBfState();
+}
+
+function syncFromProfile(tokId){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok||!tok.profileId){ showToast('⚠ لا يوجد بروفايل مرتبط'); return; }
+  const profiles = getAmazadProfiles();
+  const p = profiles.find(x=>String(x.saveId||x.id)===String(tok.profileId));
+  if(!p){ showToast('⚠ لم يُعثر على البروفايل'); return; }
+  tok.hpMax            = p.hpMax || p.hp || tok.hpMax;
+  tok.hp               = p.hpCurrent ?? tok.hpMax;
+  tok.halaMax          = p.halaMax || p.hala || tok.halaMax;
+  tok.hala             = p.halaCurrent ?? tok.halaMax;
+  tok.staminaMax       = p.staminaMax || 100;
+  tok.stamina          = p.staminaCurrent ?? tok.staminaMax;
+  tok.defense          = p.defense       ?? 0;
+  tok.trueDefense      = p.trueDefense   ?? p.trueDef ?? 0;
+  tok.dmgReduce        = p.dmgReduce     ?? 0;
+  tok.immunity         = p.immunity      ?? 0;
+  tok.physStrPct       = p.physStrPct    ?? 0;
+  tok.charSize         = p.charSize      ?? p.size ?? 170;
+  tok.lifeGrade        = p.lifeGrade     || '';
+  tok.classes          = p.classes       || [];
+  tok.charSize         = p.size          || tok.charSize;
+  tok.level            = p.level         || tok.level;
+  tok.race             = p.race          || tok.race;
+  tok.barrierBinding   = p.barrierBinding || null;
+  applyDerivedChances(tok, p, true);
+  tok.raceColor        = RC[p.race]      || tok.raceColor;
+  // مزامنة بارات الصحة الإضافية
+  if(p.extraHpBars && p.extraHpBars.length > 0){
+    tok.extraBars = p.extraHpBars.map(b=>({
+      id: b.id||Date.now()+Math.random(),
+      label: b.label||'بار إضافي',
+      color: b.color||'#f97316',
+      current: b.current??b.max??100,
+      max: b.max||100,
+    }));
+  }
+  const el = document.getElementById('tok_'+tokId);
+  if(el){ el.remove(); renderToken(tok); }
+  if(openPopups[tokId]){ closePopup(tokId); openBattlePopup(tokId); }
+  showToast('🔄 تمت المزامنة الكاملة');
+  saveBfState();
+}
+
+/* ═══════════════════════════════════════
+   TOKEN IMAGE UPLOAD
+═══════════════════════════════════════ */
+function uploadTokenImg(tokId){
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      openCropModal(ev.target.result, tokId);
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function openCropModal(src, tokId){
+  openModal(`
+    <span class="modal-handle"></span>
+    <div class="modal-title">✂ قص الصورة</div>
+    <div class="crop-modal-inner">
+      <div class="crop-canvas-wrap" id="crop-circle">
+        <img id="crop-img" src="${src}" class="crop-img" draggable="false"
+          style="position:absolute;transform-origin:center center;left:0;top:0;">
+      </div>
+      <div class="crop-controls">
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('zoom',0.1)">🔍+</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('zoom',-0.1)">🔍−</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('x',-10)">←</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('x',10)">→</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('y',-10)">↑</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('y',10)">↓</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);text-align:center;">اسحب الصورة داخل الدائرة لضبط المحاذاة</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" style="flex:1" onclick="saveCrop('${tokId}')">حفظ الصورة</button>
+      <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
+    </div>
+  `);
+  setTimeout(()=>setupCropDrag(src, tokId), 100);
+}
+
+let cropState = {zoom:1, x:0, y:0, srcW:0, srcH:0};
+
+function setupCropDrag(src, tokId){
+  const img = document.getElementById('crop-img');
+  if(!img) return;
+  cropState = {zoom:1, x:0, y:0};
+  const circle = document.getElementById('crop-circle');
+  const cSize = 220;
+
+  // load natural dimensions
+  const tmpImg = new Image();
+  tmpImg.onload = () => {
+    cropState.srcW = tmpImg.naturalWidth;
+    cropState.srcH = tmpImg.naturalHeight;
+    // fit image into circle
+    const fitZoom = Math.max(cSize/cropState.srcW, cSize/cropState.srcH);
+    cropState.zoom = fitZoom;
+    applyCropTransform();
+  };
+  tmpImg.src = src;
+
+  let dragging = false, startX=0, startY=0, startCX=0, startCY=0;
+  const onDown = e => {
+    dragging=true;
+    const ev = e.touches?e.touches[0]:e;
+    startX=ev.clientX; startY=ev.clientY;
+    startCX=cropState.x; startCY=cropState.y;
+    e.preventDefault();
+  };
+  const onMove = e => {
+    if(!dragging) return;
+    const ev = e.touches?e.touches[0]:e;
+    cropState.x = startCX + (ev.clientX-startX);
+    cropState.y = startCY + (ev.clientY-startY);
+    applyCropTransform();
+    e.preventDefault();
+  };
+  const onUp = ()=>{ dragging=false; };
+  circle.addEventListener('mousedown',onDown);
+  circle.addEventListener('touchstart',onDown,{passive:false});
+  window.addEventListener('mousemove',onMove);
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('mouseup',onUp);
+  window.addEventListener('touchend',onUp);
+}
+
+function applyCropTransform(){
+  const img = document.getElementById('crop-img');
+  if(!img) return;
+  img.style.width  = (cropState.srcW * cropState.zoom) + 'px';
+  img.style.height = (cropState.srcH * cropState.zoom) + 'px';
+  img.style.left   = (110 - (cropState.srcW*cropState.zoom/2) + cropState.x) + 'px';
+  img.style.top    = (110 - (cropState.srcH*cropState.zoom/2) + cropState.y) + 'px';
+}
+
+function cropAdjust(axis, delta){
+  if(axis==='zoom') cropState.zoom = Math.max(0.05, cropState.zoom+delta);
+  else if(axis==='x') cropState.x += delta;
+  else if(axis==='y') cropState.y += delta;
+  applyCropTransform();
+}
+
+function saveCrop(tokId){
+  // draw circle-cropped canvas
+  const cSize = 220;
+  const canvas = document.createElement('canvas');
+  canvas.width = cSize; canvas.height = cSize;
+  const ctx = canvas.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(cSize/2, cSize/2, cSize/2, 0, Math.PI*2);
+  ctx.clip();
+  const img = document.getElementById('crop-img');
+  const w = cropState.srcW * cropState.zoom;
+  const h = cropState.srcH * cropState.zoom;
+  const x = 110 - (w/2) + cropState.x;
+  const y = 110 - (h/2) + cropState.y;
+  ctx.drawImage(img, x, y, w, h);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(tok){
+    saveCharImage(tok.profileId||tok.id, dataUrl);
+    // also cache on token itself for quick render
+    tok._imgCache = dataUrl;
+    const el = document.getElementById('tok_'+tokId);
+    if(el){ el.remove(); renderToken(tok); }
+  }
+  closeModal();
+  showToast('📷 تم حفظ الصورة');
+  saveBfState();
+}
+
+/* ═══════════════════════════════════════
+   MAP SETUP MODAL
+═══════════════════════════════════════ */
+function openMapSetup(){
+  const c = state.gridCols, r = state.gridRows, cp = state.cellPx;
+  const gridClr = state.gridColor || 'rgba(200,30,30,0.65)';
+  const sens = state.panSensitivity || 1.0;
+  openModal(`
+    <span class="modal-handle"></span>
+    <div class="modal-title">🗺 إعداد الخريطة</div>
+
+    <div class="form-group">
+      <div class="form-label">تحميل خريطة</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <div class="map-upload-zone" id="map-upload-zone" onclick="triggerMapUpload()" style="flex:1;">
+          <div class="map-upload-zone-icon">${state.mapSrc?'✅':'📸'}</div>
+          <div class="map-upload-zone-text">${state.mapSrc?'اضغط لتغيير الخريطة':'تحميل صورة'}</div>
+        </div>
+        <button onclick="useWhiteMap()" style="padding:8px 12px;background:#f8fafc11;border:1px solid #e2e8f033;border-radius:10px;color:#e2e8f0;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">
+          🗒 خريطة<br>بيضاء
+        </button>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;background:var(--bg3);border-radius:8px;padding:8px 10px;line-height:1.7;">
+      💡 الصورة ستُمدَّد لتغطي الشبكة بالكامل
+    </div>
+
+    <div class="form-row" style="margin-bottom:10px;">
+      <div class="form-group">
+        <div class="form-label">عدد الأعمدة</div>
+        <input type="number" class="form-input" id="grid-cols-inp" value="${c}" min="1" max="500" style="text-align:center;">
+      </div>
+      <div class="form-group">
+        <div class="form-label">عدد الصفوف</div>
+        <input type="number" class="form-input" id="grid-rows-inp" value="${r}" min="1" max="500" style="text-align:center;">
+      </div>
+    </div>
+
+    <div class="grid-control">
+      <label>حجم الخلية (px)</label>
+      <input type="range" id="cell-size-slider" min="20" max="200" value="${cp}"
+        oninput="document.getElementById('cell-size-val').textContent=this.value">
+      <span class="val" id="cell-size-val">${cp}</span>
+    </div>
+
+    <!-- لون الشبكة -->
+    <div class="form-group" style="margin-top:10px;">
+      <div class="form-label">لون الشبكة</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        ${[
+          {label:'أحمر',   c:'rgba(220,40,40,0.65)'},
+          {label:'أزرق',   c:'rgba(30,100,220,0.65)'},
+          {label:'أبيض',   c:'rgba(255,255,255,0.35)'},
+          {label:'أخضر',   c:'rgba(30,180,60,0.65)'},
+          {label:'أصفر',   c:'rgba(240,190,30,0.65)'},
+          {label:'بنفسجي', c:'rgba(130,50,220,0.65)'},
+          {label:'بلا',    c:'rgba(0,0,0,0)'},
+        ].map(({label,c})=>`
+          <button onclick="setGridColorPreset('${c}')"
+            style="padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;font-family:inherit;
+            border:2px solid ${'${gridClr}'===c?'#fff':'transparent'};
+            background:${c==='rgba(0,0,0,0)'?'transparent':c};
+            color:${c.includes('255,255,255')||c.includes('240,190')?'#000':'#fff'};
+            font-weight:700;" id="gclr-${label}">${label}
+          </button>
+        `).join('')}
+        <input type="color" id="grid-clr-custom" value="#dc2626"
+          onchange="setGridColorCustom(this.value)"
+          style="width:30px;height:28px;border-radius:6px;border:1px solid var(--border2);cursor:pointer;background:none;padding:0;">
+      </div>
+    </div>
+
+    <!-- حساسية التحريك -->
+    <div class="grid-control" style="margin-top:8px;">
+      <label>حساسية التحريك</label>
+      <input type="range" id="pan-sens-slider" min="0.2" max="3.0" step="0.1" value="${sens}"
+        oninput="document.getElementById('pan-sens-val').textContent=parseFloat(this.value).toFixed(1)+'×'">
+      <span class="val" id="pan-sens-val">${sens.toFixed(1)}×</span>
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);margin-bottom:12px;text-align:center;">
+      الشبكة النهائية: <span id="grid-preview">${c}×${r}</span> خلية
+    </div>
+
+    ${state.mapSrc?`
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
+        الحجم المنطقي: ${state.mapW}×${state.mapH}px (صورة: ${state.mapNatW}×${state.mapNatH}px)
+      </div>
+    `:''}
+
+    <div class="btn-row">
+      <button class="btn btn-primary" style="flex:1" onclick="applyMapSettings()">تطبيق</button>
+      ${state.mapSrc?`<button class="btn btn-red" onclick="removeMap()">🗑 إزالة</button>`:''}
+      <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
+    </div>
+  `);
+
+  ['grid-cols-inp','grid-rows-inp'].forEach(id=>{
+    document.getElementById(id)?.addEventListener('input', ()=>{
+      const gc = document.getElementById('grid-cols-inp')?.value||20;
+      const gr = document.getElementById('grid-rows-inp')?.value||20;
+      const pv = document.getElementById('grid-preview');
+      if(pv) pv.textContent = gc+'×'+gr;
+    });
+  });
+}
+
+function setGridColorPreset(clr){
+  state.gridColor = clr;
+  state.gridBorderColor = clr.replace(/[\d.]+\)$/, '0.95)');
+  renderGrid();
+}
+
+function setGridColorCustom(hex){
+  // Convert hex to rgba
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  state.gridColor = `rgba(${r},${g},${b},0.65)`;
+  state.gridBorderColor = `rgba(${r},${g},${b},0.95)`;
+  renderGrid();
+}
+
+function useWhiteMap(){
+  // إنشاء canvas أبيض بحجم الشبكة
+  const cols = parseInt(document.getElementById('grid-cols-inp')?.value) || state.gridCols;
+  const rows = parseInt(document.getElementById('grid-rows-inp')?.value) || state.gridRows;
+  const cp   = parseInt(document.getElementById('cell-size-slider')?.value) || state.cellPx;
+  const W = cols * cp, H = rows * cp;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f8f8f6';
+  ctx.fillRect(0,0,W,H);
+  window._pendingMap = { src: canvas.toDataURL('image/png'), w: W, h: H };
+  const zone = document.getElementById('map-upload-zone');
+  if(zone) zone.innerHTML = `<div class="map-upload-zone-icon">⬜</div><div class="map-upload-zone-text">خريطة بيضاء ${W}×${H}</div>`;
+  showToast('⬜ تم تجهيز الخريطة البيضاء — اضغط "تطبيق"');
+}
+
+let _mapUploadInput = null;
+function triggerMapUpload(){
+  _mapUploadInput = document.createElement('input');
+  _mapUploadInput.type='file'; _mapUploadInput.accept='image/*';
+  _mapUploadInput.onchange = e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      // load to get natural dimensions
+      const img=new Image();
+      img.onload=()=>{
+        window._pendingMap = {src:ev.target.result, w:img.naturalWidth, h:img.naturalHeight};
+        const zone=document.getElementById('map-upload-zone');
+        if(zone) zone.innerHTML=`<div class="map-upload-zone-icon">✅</div><div class="map-upload-zone-text">${f.name} — ${img.naturalWidth}×${img.naturalHeight}</div>`;
+      };
+      img.src=ev.target.result;
+    };
+    r.readAsDataURL(f);
+  };
+  _mapUploadInput.click();
+}
+
+function applyMapSettings(){
+  const colsEl = document.getElementById('grid-cols-inp');
+  const rowsEl = document.getElementById('grid-rows-inp');
+  const slider  = document.getElementById('cell-size-slider');
+  const sensEl  = document.getElementById('pan-sens-slider');
+
+  const cols = Math.max(1, parseInt(colsEl?.value)||state.gridCols);
+  const rows = Math.max(1, parseInt(rowsEl?.value)||state.gridRows);
+  const cp   = parseInt(slider?.value)||state.cellPx;
+  const sens = parseFloat(sensEl?.value)||state.panSensitivity||1.0;
+
+  state.gridCols = cols;
+  state.gridRows = rows;
+  state.cellPx   = cp;
+  state.panSensitivity = sens;
+  state.mapW = cols * cp;
+  state.mapH = rows * cp;
+
+  if(window._pendingMap){
+    state.mapSrc  = window._pendingMap.src;
+    state.mapNatW = window._pendingMap.w;
+    state.mapNatH = window._pendingMap.h;
+    window._pendingMap = null;
+  }
+
+  closeModal();
+  renderAll();
+  saveBfState();
+}
+
+function removeMap(){
+  if(!confirm('هل تريد إزالة الخريطة؟ الشخصيات ستبقى.')) return;
+  state.mapSrc=null; state.mapW=0; state.mapH=0;
+  closeModal(); renderAll(); saveBfState();
+}
+
+/* ═══════════════════════════════════════
+   NPC PICKER MODAL
+═══════════════════════════════════════ */
+async function openNpcPicker(){
+  // تحديث الكاش من Supabase أولاً
+  showToast('⏳ جاري تحميل الشخصيات...');
+  await fetchAmazadProfiles();
+
+  const profiles = getAmazadProfiles();
+
+  let html = `
+    <span class="modal-handle"></span>
+    <div class="modal-title">👤 إضافة شخصية إلى الخريطة</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:10px;color:var(--muted);" id="npc-pick-count">
+        ${profiles.length} شخصية محفوظة
+      </div>
+      <button onclick="openNpcPicker()" style="padding:3px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:10px;cursor:pointer;font-family:inherit;">🔄 تحديث</button>
+    </div>
+  `;
+
+  if(!state.mapSrc){
+    html += `<div style="color:#f59e0b;font-size:12px;margin-bottom:12px;">⚠ يجب تحميل خريطة أولاً</div>`;
+  }
+
+  if(profiles.length){
+    html += `<input type="text" class="npc-pick-search" id="npc-pick-search" placeholder="🔍 بحث بالاسم..." oninput="renderNpcPickList(this.value)" autocomplete="off">`;
+  }
+
+  html += `<div id="npc-pick-list"></div>`;
+
+  html += `
+    <div class="sec-div"></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:700;">الشخصيات على الخريطة (${state.tokens.length})</div>
+  `;
+
+  if(state.tokens.length===0){
+    html += `<div style="font-size:11px;color:var(--muted2);text-align:center;padding:8px 0;">لا توجد شخصيات على الخريطة بعد</div>`;
+  } else {
+    state.tokens.forEach(tok=>{
+      const imgSrc = getCharImage(tok.profileId);
+      const col = Math.floor(tok.x/state.cellPx);
+      const row = Math.floor(tok.y/state.cellPx);
+      html += `
+        <div class="connected-token">
+          <div class="connected-token-avatar">
+            ${imgSrc?`<img src="${imgSrc}">`:(tok.emoji||'⚔')}
+          </div>
+          <span class="connected-token-name">${tok.name}</span>
+          <span class="connected-token-pos">عمود ${col}, صف ${row}</span>
+          <button class="remove-token-btn" onclick="removeToken('${tok.id}');closeModal();openNpcPicker();">×</button>
+        </div>
+      `;
+    });
+  }
+
+  html += `<div class="btn-row"><button class="btn btn-ghost" style="flex:1" onclick="closeModal()">إغلاق</button></div>`;
+  openModal(html);
+  renderNpcPickList('');
+}
+
+/* يُعيد رسم قائمة الشخصيات داخل الـ picker فقط (بدون إعادة بناء المودال كله) — يُستخدم مع البحث الفوري */
+function renderNpcPickList(filterText){
+  const listEl = document.getElementById('npc-pick-list');
+  if(!listEl) return;
+
+  const profiles = getAmazadProfiles();
+  const onMap = new Set(state.tokens.map(t=>t.profileId));
+  const q = (filterText||'').trim().toLowerCase();
+  const filtered = q ? profiles.filter(p=>(p.name||'').toLowerCase().includes(q)) : profiles;
+
+  const countEl = document.getElementById('npc-pick-count');
+  if(countEl){
+    countEl.textContent = q
+      ? `${filtered.length} من ${profiles.length} شخصية`
+      : `${profiles.length} شخصية محفوظة`;
+  }
+
+  if(!profiles.length){
+    listEl.innerHTML = `<div class="npc-pick-empty">لا توجد شخصيات محفوظة بعد<br><span style="font-size:10px;">أضف شخصيات من مولّد أمازاد أولاً</span></div>`;
+    return;
+  }
+
+  if(!filtered.length){
+    listEl.innerHTML = `<div class="npc-pick-empty">لا توجد نتائج مطابقة لـ «${filterText}»</div>`;
+    return;
+  }
+
+  let html = '';
+  filtered.forEach(p=>{
+    const pid = p.saveId || p.id;
+    const imgSrc = getCharImage(pid);
+    const raceColor = RC[p.race]||'#7c3aed';
+    const alreadyOn = onMap.has(pid);
+    html += `
+      <div class="npc-pick-item" onclick="addTokenFromProfile('${pid}')" style="${alreadyOn?'opacity:.55':''}" title="${alreadyOn?'موجود على الخريطة':''}">
+        <div class="npc-pick-avatar" style="border-color:${raceColor}">
+          ${imgSrc?`<img src="${imgSrc}">`:(p.race?p.race[0]:'?')}
+        </div>
+        <div class="npc-pick-info">
+          <div class="npc-pick-name" style="color:${raceColor}">${p.name||'بدون اسم'} ${alreadyOn?'✓':''}</div>
+          <div class="npc-pick-sub">${p.race||''} • Lv.${p.level||1} • ${p.background||''}</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);">
+          ❤${p.hp||0} ✨${p.hala||0}
+        </div>
+      </div>
+    `;
+  });
+  listEl.innerHTML = html;
+}
+
+function addTokenFromProfile(profileId){
+  if(!state.mapSrc){ showToast('⚠ يجب تحميل خريطة أولاً'); return; }
+  const profiles = getAmazadProfiles();
+  const p = profiles.find(x=>(x.saveId||x.id)===profileId||(x.saveId||x.id)==profileId);
+  if(!p){ showToast('⚠ لم يُعثر على الشخصية'); return; }
+
+  const pid = p.saveId || p.id;
+
+  const wrapRect = bfWrap.getBoundingClientRect();
+  const cx = (wrapRect.width/2  - state.pan.x) / state.zoom;
+  const cy = (wrapRect.height/2 - state.pan.y) / state.zoom;
+  const col = Math.round(cx/state.cellPx);
+  const row = Math.round(cy/state.cellPx);
+
+  // Read HP/hala/stamina — try combat-mode current values first
+  const hpMax    = p.hpMax  || p.hp  || 100;
+  const hpCurr   = p.hpCurrent  ?? hpMax;
+  const haMax    = p.halaMax || p.hala || 100;
+  const haCurr   = p.halaCurrent ?? haMax;
+  const stMax    = p.staminaMax || 100;
+  const stCurr   = p.staminaCurrent ?? stMax;
+  const charSize = p.size || p.height || 100;
+
+  const tok = {
+    id:         Date.now()+'_'+Math.random().toString(36).substr(2,5),
+    profileId:  String(pid),
+    name:       p.name||'بدون اسم',
+    race:       p.race||'',
+    raceColor:  RC[p.race]||'#7c3aed',
+    level:      p.level||1,
+    lifeGrade:  p.lifeGrade||'',
+    charSize,
+    emoji:      raceEmoji(p.race),
+    hp:         hpCurr,
+    hpMax,
+    hala:       haCurr,
+    halaMax:    haMax,
+    stamina:    stCurr,
+    staminaMax: stMax,
+    defense:    p.defense    ?? 0,
+    immunity:   p.immunity   ?? 0,
+    trueDefense:p.trueDefense ?? p.trueDef ?? 0,
+    dmgReduce:  p.dmgReduce  ?? 0,
+    physStrPct: p.physStrPct ?? 0,
+    classes:    p.classes||[],
+    // بارات صحة إضافية
+    extraBars:  (p.extraHpBars||[]).map(b=>({
+      id: b.id||Date.now()+Math.random(),
+      label: b.label||'بار إضافي',
+      color: b.color||'#f97316',
+      current: b.current??b.max??100,
+      max: b.max||100,
+    })),
+    barrierBinding: p.barrierBinding || null,   // كان لا يُنسخ فلا يؤثر ربط الحاجز على الضرر
+    x: col * state.cellPx,
+    y: row * state.cellPx,
+  };
+  applyDerivedChances(tok, p, false);
+
+  state.tokens.push(tok);
+  closeModal();
+  renderToken(tok);
+  updateTokenCountDisplay();
+  saveBfState();
+  showToast(`✓ ${tok.name} أضيفت إلى الخريطة`);
+}
+
+function raceEmoji(race){
+  const map = {
+    "إنسان":"🧑","سكارد":"💜","آلزاداكايند":"🐉","إتشيرما":"👁",
+    "سيلافين":"✨","بهائم الظلام":"🌑","وحش الظلام":"🌒",
+    "ساروفيان":"🟢","ساروفيان خرافي":"🔵","رؤوس الكلاب":"🐕","حيوان":"🐾",
+  };
+  return map[race]||'⚔';
+}
+
+function removeToken(tokId){
+  if(typeof combatOnTokenRemoved==='function') combatOnTokenRemoved(tokId);
+  state.tokens = state.tokens.filter(t=>t.id!==tokId);
+  const el = document.getElementById('tok_'+tokId);
+  if(el) el.remove();
+  if(selectedTokenId===tokId){ selectToken(null); }
+  closePopup(tokId);
+  updateTokenCountDisplay();
+  saveBfState();
+  showToast('🗑 تمت إزالة الشخصية');
+}
+
+/* ═══════════════════════════════════════
+   CLEAR BATTLEFIELD
+═══════════════════════════════════════ */
+function clearBattlefield(){
+  if(!confirm('هل تريد مسح الخريطة وجميع الشخصيات من هذه الجلسة؟')) return;
+  state.mapSrc=null; state.mapW=0; state.mapH=0;
+  state.tokens=[]; state.pan={x:0,y:0}; state.zoom=1;
+  closeAllPopups(); renderAll(); saveBfState();
+  showToast('🗑 تم مسح ساحة المعركة');
+}
+
+/* ═══════════════════════════════════════
+   MODAL SYSTEM
+═══════════════════════════════════════ */
+let _modalEl = null;
+function openModal(html){
+  closeModal();
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.id = 'modal-bg';
+  bg.addEventListener('click', e=>{ if(e.target===bg) closeModal(); });
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = html;
+  bg.appendChild(modal);
+  document.body.appendChild(bg);
+  _modalEl = bg;
+}
+function closeModal(){
+  if(_modalEl){ _modalEl.remove(); _modalEl=null; }
+  window._pendingMap = null;
+}
+
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+let _toastTimer = null;
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>{ el.style.display='none'; }, 2200);
+}
+
+/* ═══════════════════════════════════════
+   PROFILE IMAGE UPLOAD (standalone, for amazad main profiles)
+   Called from outside context
+═══════════════════════════════════════ */
+function openProfileImageManager(){
+  const profiles = getAmazadProfiles();
+  if(!profiles.length){ showToast('⚠ لا توجد شخصيات'); return; }
+
+  let html = `
+    <span class="modal-handle"></span>
+    <div class="modal-title">📷 صور البروفايلات</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:14px;">
+      الصور محفوظة تلقائياً في الجهاز ولا تحتاج تحميلها مجدداً
+    </div>
+  `;
+  profiles.forEach(p=>{
+    const pid = p.saveId||p.id;
+    const imgSrc = getCharImage(pid);
+    const raceColor = RC[p.race]||'#7c3aed';
+    html += `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">
+        <div onclick="uploadProfileImg('${pid}')" style="width:48px;height:48px;border-radius:50%;border:2px solid ${raceColor};overflow:hidden;background:var(--bg2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;flex-shrink:0;">
+          ${imgSrc?`<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;">`:(p.race?p.race[0]:'?')}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:${raceColor}">${p.name||'—'}</div>
+          <div style="font-size:10px;color:var(--muted)">${p.race} • Lv.${p.level}</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button style="padding:5px 8px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--muted);font-size:11px;cursor:pointer;" onclick="uploadProfileImg('${pid}')">📷</button>
+          ${imgSrc?`<button style="padding:5px 8px;background:var(--bg2);border:1px solid #ef444433;border-radius:7px;color:#ef4444;font-size:11px;cursor:pointer;" onclick="deleteProfileImg('${pid}')">🗑</button>`:''}
+        </div>
+      </div>
+    `;
+  });
+  html += `<div class="btn-row"><button class="btn btn-ghost" style="flex:1" onclick="closeModal()">إغلاق</button></div>`;
+  openModal(html);
+}
+
+function uploadProfileImg(profileId){
+  const input = document.createElement('input');
+  input.type='file'; input.accept='image/*';
+  input.onchange = e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=ev=>{ openCropModalForProfile(ev.target.result, profileId); };
+    r.readAsDataURL(f);
+  };
+  input.click();
+}
+
+function openCropModalForProfile(src, profileId){
+  closeModal();
+  openModal(`
+    <span class="modal-handle"></span>
+    <div class="modal-title">✂ قص الصورة</div>
+    <div class="crop-modal-inner">
+      <div class="crop-canvas-wrap" id="crop-circle">
+        <img id="crop-img" src="${src}" class="crop-img" draggable="false"
+          style="position:absolute;transform-origin:center center;left:0;top:0;">
+      </div>
+      <div class="crop-controls">
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('zoom',0.1)">🔍+</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('zoom',-0.1)">🔍−</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('x',-10)">←</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('x',10)">→</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('y',-10)">↑</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px;" onclick="cropAdjust('y',10)">↓</button>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" style="flex:1" onclick="saveCropForProfile('${profileId}')">حفظ</button>
+      <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
+    </div>
+  `);
+  setTimeout(()=>setupCropDrag(src, null), 100);
+}
+
+function saveCropForProfile(profileId){
+  const cSize = 220;
+  const canvas = document.createElement('canvas');
+  canvas.width = cSize; canvas.height = cSize;
+  const ctx = canvas.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(cSize/2,cSize/2,cSize/2,0,Math.PI*2);
+  ctx.clip();
+  const img = document.getElementById('crop-img');
+  const w = cropState.srcW * cropState.zoom;
+  const h = cropState.srcH * cropState.zoom;
+  const x = 110-(w/2)+cropState.x;
+  const y = 110-(h/2)+cropState.y;
+  ctx.drawImage(img,x,y,w,h);
+  const dataUrl = canvas.toDataURL('image/jpeg',0.85);
+  saveCharImage(profileId, dataUrl);
+  // update tokens that use this profile
+  state.tokens.forEach(tok=>{
+    if(tok.profileId===profileId){
+      tok._imgCache=dataUrl;
+      const el=document.getElementById('tok_'+tok.id);
+      if(el){el.remove(); renderToken(tok);}
+    }
+  });
+  closeModal();
+  showToast('📷 تم حفظ الصورة');
+}
+
+function deleteProfileImg(profileId){
+  deleteCharImage(profileId);
+  closeModal();
+  // re-open
+  openProfileImageManager();
+  // re-render affected tokens
+  state.tokens.forEach(tok=>{
+    if(tok.profileId===profileId){
+      const el=document.getElementById('tok_'+tok.id);
+      if(el){el.remove(); renderToken(tok);}
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════
+   ATTACK LAUNCHER & DAMAGE CALCULATOR
+   ─────────────────────────────────────────────────────
+   Attack types:  physical | magical | true
+   Defense order:
+     1. percentDef  (physStrPct) — half vs physical unless barrier bound to بأس
+     2. defense     (flat)
+     3. trueDefense (flat, after 1+2)
+   Barrier binding bonus:
+     degree "ثالثة" → percentDef works fully vs physical
+     degree "ثانية" → 25% effectiveness vs true damage
+     degree "أولى"  → 50% effectiveness vs true damage
+═══════════════════════════════════════════════════════ */
+
+let _dmgPopupZ = 600;
+function nextDmgZ(){ return ++_dmgPopupZ; }
+
+/* ── OPEN ATTACK LAUNCHER ── */
+function openAttackLauncher(fromTokId){
+  if(!state.mapSrc){ showToast('⚠ يجب تحميل خريطة أولاً'); return; }
+
+  // أسلحة/تقنيات المهاجم المختار فقط (وبلا مهاجم: التقنيات العامة) — كي لا تطول القائمة بأسلحة كل الشخصيات
+  const allTechs = cbAtkTechs(fromTokId||'');
+
+  // build attacker options
+  let attackerOpts = `<option value="">— بدون مهاجم —</option>`;
+  state.tokens.forEach(tok=>{
+    attackerOpts += `<option value="${tok.id}" ${fromTokId===tok.id?'selected':''}>${tok.name}</option>`;
+  });
+
+  let techListHTML = `
+    <div class="dmg-section-title" style="margin-top:10px;">🗡 اختر تقنية / سلاح</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;max-height:220px;overflow-y:auto;" id="atk-tech-chips">${cbAtkTechChipsHTML(allTechs)}</div>`;
+  _atkTechList = allTechs;
+
+  const el = document.createElement('div');
+  el.className = 'dmg-popup';
+  el.style.zIndex = nextDmgZ();
+  const sw=window.innerWidth, sh=window.innerHeight;
+  el.style.left = Math.max(8, Math.min(sw-320, sw/2-155)) + 'px';
+  el.style.top  = Math.max(60, sh/2-300) + 'px';
+  el.id = 'atk-launcher';
+
+  el.innerHTML = `
+    <div class="dmg-drag-bar" id="atk-drag-bar"><div class="dmg-drag-handle"></div></div>
+    <button class="bp-close" onclick="this.parentElement.remove()">×</button>
+
+    <div class="bp-body">
+    <div style="font-size:13px;font-weight:900;color:#ef4444;margin-bottom:12px;">⚔ إطلاق هجمة</div>
+
+    <div class="dmg-section">
+      <div class="dmg-section-title">المهاجم</div>
+      <select id="atk-attacker" class="dmg-input" style="width:100%;direction:rtl;" onchange="onAtkAttackerChange()">
+        ${attackerOpts}
+      </select>
+    </div>
+
+    <div class="dmg-section">
+      ${techListHTML}
+    </div>
+
+    <div class="dmg-section">
+      <div class="dmg-section-title">نوع الهجمة</div>
+      <div style="display:flex;gap:5px;">
+        <button class="atk-type-btn active" id="atktype-physical" onclick="setAtkType('physical')">جسدية ⚔</button>
+        <button class="atk-type-btn" id="atktype-magical" onclick="setAtkType('magical')">سحرية ✨</button>
+      </div>
+    </div>
+
+    <div class="dmg-section">
+      <div class="dmg-section-title">الضرر</div>
+      <div class="dmg-input-row">
+        <span class="dmg-label">الضرر الأساسي</span>
+        <input class="dmg-input" id="atk-dmg" type="number" value="0" min="0" placeholder="0">
+      </div>
+      <div class="dmg-input-row">
+        <span class="dmg-label">الضرر الحقيقي</span>
+        <input class="dmg-input" id="atk-true-dmg" type="number" value="0" min="0" placeholder="0">
+      </div>
+    </div>
+
+    <div class="dmg-section">
+      <div class="dmg-section-title">🔥 مقاومة إضافية يدوية (اختياري)</div>
+      <div style="font-size:9px;color:var(--muted);margin-bottom:6px;">
+        مقاومة منفصلة عن دفاع الشخصية المحفوظ — تُضاف حسب الظروف (مثل مقاومة عنصرية) وتتراكم مضاعفةً، لا جمعاً
+      </div>
+      <div class="dmg-input-row">
+        <span class="dmg-label">اسم المقاومة</span>
+        <input class="dmg-input" id="atk-extra-res-label" type="text" placeholder="مثال: مقاومة النار" style="direction:rtl;">
+      </div>
+      <div class="dmg-input-row">
+        <span class="dmg-label">نسبة المقاومة</span>
+        <input class="dmg-input" id="atk-extra-res-pct" type="number" value="0" min="0" max="100" placeholder="0">
+        <span style="font-size:10px;color:var(--muted);margin-right:4px;">٪</span>
+      </div>
+    </div>
+
+    <div class="dmg-section">
+      <div class="dmg-section-title">نطاق الهجمة (خلايا)</div>
+      <div class="dmg-input-row">
+        <span class="dmg-label">النطاق</span>
+        <input class="dmg-input" id="atk-range" type="number" value="1" min="0.1" step="0.1" placeholder="1"
+          oninput="updateAtkRangePreview()">
+        <span style="font-size:10px;color:var(--muted);margin-right:4px;">خلية</span>
+      </div>
+      <button onclick="showAtkRangeOnMap()" style="width:100%;padding:5px;background:#ef444411;border:1px solid #ef444433;border-radius:7px;color:#ef4444;font-size:11px;font-weight:700;cursor:pointer;font-family:'Cairo',sans-serif;margin-top:4px;">
+        🎯 إظهار النطاق على الخريطة
+      </button>
+    </div>
+
+    <div class="dmg-section">
+      <div class="dmg-section-title">الأهداف</div>
+      <div id="atk-targets-wrap" style="display:flex;flex-wrap:wrap;gap:3px;max-height:90px;overflow-y:auto;">
+        ${state.tokens.map(tok=>`
+          <div class="target-chip" id="target-${tok.id}" onclick="toggleAtkTarget('${tok.id}')">
+            <div class="chip-dot" style="background:${tok.raceColor||'#7c3aed'}"></div>
+            ${tok.name}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <button onclick="launchDamageCalc()" style="width:100%;padding:9px;background:#ef4444;border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:900;cursor:pointer;font-family:'Cairo',sans-serif;margin-top:8px;">
+      💥 احسب الضرر
+    </button>
+    </div>
+  `;
+
+  document.getElementById('dmg-popups-layer').appendChild(el);
+  makeDraggableEl(el, document.getElementById('atk-drag-bar'));
+  keepPopupInView(el);
+  window._atkType = 'physical';
+  window._atkTargets = new Set();
+}
+
+let _atkTechList = [];
+function cbAtkTechs(attackerId){
+  const list = [];
+  if(attackerId){
+    const tok = state.tokens.find(t=>t.id===attackerId);
+    if(tok) getTechniques(tok.profileId).forEach(t=> list.push({...t, _src:tok.id, _srcName:tok.name}));
+  } else {
+    getGlobalTechniques().forEach(t=> list.push({...t, _src:'global'}));
+  }
+  return list;
+}
+function cbAtkTechChipsHTML(list){
+  if(!list.length) return '<div style="font-size:10px;color:var(--muted);padding:4px;">لا توجد أسلحة أو تقنيات لهذا المهاجم</div>';
+  return list.map((t,i)=>{
+    const src = t._src==='global' ? '🌐' : `👤 ${t._srcName||''}`;
+    return `
+      <div class="target-chip" id="tech-chip-${i}" onclick="selectAtkTech(${i})"
+        style="flex-direction:column;align-items:flex-start;width:100%;margin:0 0 4px;">
+        <span style="font-weight:700;color:var(--text)">${t.name||'—'}</span>
+        <span style="font-size:9px;color:var(--muted)">${src} ${t.diceStr||''} ${techRangeCells(t)?'• نطاق: '+fmt1(techRangeCells(t))+' خلية'+(t._rangeTierLabel?' ('+t._rangeTierLabel+')':''):''}</span>
+      </div>`;
+  }).join('');
+}
+function onAtkAttackerChange(){
+  const id = document.getElementById('atk-attacker')?.value || '';
+  _atkTechList = cbAtkTechs(id);
+  window._selectedAtkTech = null;
+  const box = document.getElementById('atk-tech-chips');
+  if(box) box.innerHTML = cbAtkTechChipsHTML(_atkTechList);
+}
+function selectAtkTech(idx){
+  document.querySelectorAll('#atk-tech-chips .target-chip').forEach((el,i)=>{
+    el.classList.toggle('selected', i===idx);
+  });
+  window._selectedAtkTech = _atkTechList[idx] || null;
+  if(window._selectedAtkTech){
+    const t = window._selectedAtkTech;
+    const rdEl  = document.getElementById('atk-range');
+    const rc = techRangeCells(t);
+    if(rdEl && rc) rdEl.value = fmt1(rc);       // نطاق التقنية/السلاح من إحصائيته (للسلاح: درجة المدى)
+  }
+}
+
+function getGlobalTechniques(){
+  try{
+    const raw = localStorage.getItem('amazad_techniques');
+    return raw ? JSON.parse(raw) : [];
+  } catch(e){ return []; }
+}
+
+function setAtkType(type){
+  window._atkType = type;
+  ['physical','magical'].forEach(t=>{
+    document.getElementById('atktype-'+t)?.classList.toggle('active', t===type);
+  });
+}
+
+function toggleAtkTarget(tokId){
+  if(!window._atkTargets) window._atkTargets = new Set();
+  const el = document.getElementById('target-'+tokId);
+  if(window._atkTargets.has(tokId)){
+    window._atkTargets.delete(tokId);
+    el?.classList.remove('selected');
+  } else {
+    window._atkTargets.add(tokId);
+    el?.classList.add('selected');
+  }
+}
+
+function showAtkRangeOnMap(){
+  const atkSel = document.getElementById('atk-attacker')?.value;
+  const range  = parseFloat(document.getElementById('atk-range')?.value)||1;
+  if(!atkSel){ showToast('اختر مهاجمًا أولاً'); return; }
+  showAttackRange(atkSel, range, window._selectedAtkTech?.name || '');
+  // نُخفي نافذة الهجمة (دون حذفها) لتظهر الخريطة؛ ⚔ أعلى النطاق تعيدها بكل معلوماتها
+  const el = document.getElementById('atk-launcher');
+  if(el) el.style.display = 'none';
+  showToast('⚔ أعلى النطاق للعودة إلى الهجمة • 💥 لتطبيقها • ✕ للإغلاق');
+}
+
+/* ── DAMAGE FORMULA ──
+   extraRes: { label, pct } — مقاومة إضافية يدوية منفصلة عن دفاع الشخصية المحفوظ.
+   تُطبَّق بعد كل طبقات الدفاع الأخرى وتتراكم مضاعفةً (لا جمعاً) مع الدفاع المئوي الأساسي:
+   الضرر المتبقي النهائي = الضرر المتبقي × (1 − extraRes.pct/100)
+   مثال: تنين بدفاع مئوي 90٪ (يتلقى 10٪) + مقاومة نار إضافية 50٪ → يتلقى 10٪ × 50٪ = 5٪ فقط، وليس 0٪. */
+function calcDamageForTarget(rawDmg, rawTrueDmg, atkType, tok, extraRes){
+  const sd       = getSideDefenses(tok);
+  const defense  = sd.defense;    // دفاع + إضافي
+  const trueDef  = sd.trueDef;    // دفاع حقيقي + إضافي
+  const baseDR   = sd.base;       // دفاع مئوي + إضافي
+  const barrier  = getTokBarrier(tok);
+  const barrierDeg = cbBarrierDegree(tok);
+  const degRank = CB_DEG_RANK[barrierDeg] || 0;   // تراكمي: ثالثة=1، ثانية=2، أولى/صفر≥3
+  const trueDefEff = degRank>=3 ? 0.5 : degRank===2 ? 0.25 : 0;   // فعالية الدفاع المئوي ضد الحقيقي
+  const extraResPct = Math.max(0, Math.min(100, parseFloat(extraRes?.pct) || 0));
+  const extraResLabel = (extraRes?.label || '').trim();
+
+  const steps = [];
+  let dmg = parseFloat(rawDmg) || 0;
+  let trueDmg = parseFloat(rawTrueDmg) || 0;
+
+  // 1. الدفاع المئوي الأساسي (dmgReduce)
+  if(baseDR > 0 && dmg > 0){
+    let effectivePct = baseDR;
+    if(atkType === 'physical'){
+      if(degRank >= 1) effectivePct = baseDR;      // ثالثة فما فوق: كالسحري — الدفاع المئوي كاملاً
+      else effectivePct = baseDR / 2;
+    } else if(atkType === 'magical'){
+      effectivePct = baseDR;
+    } else if(atkType === 'true'){
+      effectivePct = baseDR * trueDefEff;
+    }
+    if(effectivePct > 0){
+      const reduction = dmg * (effectivePct / 100);
+      steps.push({ label:`دفاع مئوي ${fmt1(baseDR)}٪ (فعّال ${fmt1(effectivePct)}٪)`, val: -reduction });
+      dmg = Math.max(0, dmg - reduction);
+    }
+  }
+
+  // 2. الدفاع الجانبي الأول (درجة 4 أو 5) — 50٪ فعالية ضد الضرر المادي
+  if(sd.side1 > 0 && dmg > 0 && atkType !== 'true'){
+    const effectiveSide1 = atkType === 'physical' ? sd.side1 * 0.5 : sd.side1;
+    const reduction = dmg * (effectiveSide1 / 100);
+    steps.push({ label:`🛡 دفاع جانبي① ${sd.side1}٪${atkType==='physical'?' (فعّال 50٪)':''}`, val: -reduction });
+    dmg = Math.max(0, dmg - reduction);
+  }
+
+  // 3. الدفاع الجانبي الثاني — 50٪ فعالية ضد المادي
+  if(sd.side2 > 0 && dmg > 0 && atkType !== 'true'){
+    const effectiveSide2 = atkType === 'physical' ? sd.side2 * 0.5 : sd.side2;
+    const reduction = dmg * (effectiveSide2 / 100);
+    const lbl = sd.isGrade5 ? `🛡 دفاع جانبي② ${sd.side2}٪` : `🌿 دفاع جانبي② (طبيعة) ${sd.side2}٪`;
+    steps.push({ label: lbl + (atkType==='physical'?' (فعّال 50٪)':''), val: -reduction });
+    dmg = Math.max(0, dmg - reduction);
+  }
+
+  // 4. الدفاع الجانبي الثالث — 50٪ فعالية ضد المادي
+  if(sd.side3 > 0 && dmg > 0 && atkType !== 'true'){
+    const effectiveSide3 = atkType === 'physical' ? sd.side3 * 0.5 : sd.side3;
+    const reduction = dmg * (effectiveSide3 / 100);
+    steps.push({ label:`🌿 دفاع جانبي③ (طبيعة) ${sd.side3}٪${atkType==='physical'?' (فعّال 50٪)':''}`, val: -reduction });
+    dmg = Math.max(0, dmg - reduction);
+  }
+
+  // 4.5. مقاومة إضافية يدوية — منفصلة عن دفاع الشخصية، تُراكم مضاعفةً على ما تبقى من الضرر
+  //      (وليس جمعاً مع الدفاع المئوي الأساسي) — تنطبق على الضرر المادي والسحري، لا على الحقيقي مباشرة
+  if(extraResPct > 0 && dmg > 0 && atkType !== 'true'){
+    const reduction = dmg * (extraResPct / 100);
+    const lbl = extraResLabel ? `🔥 ${extraResLabel} ${extraResPct}٪ (تراكم مضاعف)` : `🔥 مقاومة إضافية ${extraResPct}٪ (تراكم مضاعف)`;
+    steps.push({ label: lbl, val: -reduction });
+    dmg = Math.max(0, dmg - reduction);
+  }
+
+  // 5. الدفاع الثابت العادي
+  if(defense > 0 && dmg > 0 && atkType !== 'true'){
+    const reduction = Math.min(dmg, defense);
+    steps.push({ label:`دفاع عادي ${fmt1(defense)}`, val:-reduction });
+    dmg = Math.max(0, dmg - reduction);
+  }
+
+  // 6. الدفاع الحقيقي
+  if(trueDef > 0 && dmg > 0){
+    const reduction = Math.min(dmg, trueDef);
+    steps.push({ label:`دفاع حقيقي ${fmt1(trueDef)}`, val:-reduction });
+    dmg = Math.max(0, dmg - reduction);
+  }
+
+  let finalDmg = dmg;
+  let usedTruePath = false;
+  if(finalDmg <= 0 && trueDmg > 0){
+    usedTruePath = true;
+    // ربط الحاجز بالبأس: الدفاع المئوي يعمل ضد الضرر الحقيقي بفعالية 25٪ (درجة ثانية) أو 50٪ (درجة أولى)، وبلا فعالية في الثالثة
+    const truePctEff = baseDR * trueDefEff;
+    let trueAfterPct = trueDmg;
+    if(truePctEff > 0){
+      const red = trueDmg * (truePctEff/100);
+      trueAfterPct = Math.max(0, trueDmg - red);
+      steps.push({ label:`دفاع مئوي ضد الضرر الحقيقي ${fmt1(baseDR)}٪ (فعّال ${fmt1(truePctEff)}٪ — ربط الحاجز بالبأس ${barrierDeg})`, val: -red });
+    }
+    finalDmg = Math.max(0, trueAfterPct - trueDef);
+    steps.push({ label:`اللجوء للضرر الحقيقي: ${fmt1(trueAfterPct)} - ${fmt1(trueDef)}`, val: finalDmg, isTrue:true });
+  }
+
+  // قاعدة العشرية: كل قيمة تُقتطع لخانة واحدة، فيتطابق ما يُعرض مع ما يُطبَّق على الصحة
+  steps.forEach(s=>{ s.val = trunc1(s.val); });
+  finalDmg = trunc1(finalDmg);
+  return { finalDmg, steps, usedTruePath };
+}
+
+/* ── LAUNCH DAMAGE CALC ── */
+function launchDamageCalc(){
+  const rawDmg     = parseFloat(document.getElementById('atk-dmg')?.value)||0;
+  const rawTrueDmg = parseFloat(document.getElementById('atk-true-dmg')?.value)||0;
+  const atkType    = window._atkType || 'physical';
+  const targets    = window._atkTargets || new Set();
+  const extraResPct   = parseFloat(document.getElementById('atk-extra-res-pct')?.value) || 0;
+  const extraResLabel = (document.getElementById('atk-extra-res-label')?.value || '').trim();
+  const extraRes = { label: extraResLabel, pct: extraResPct };
+
+  if(targets.size === 0){ showToast('⚠ اختر هدفاً واحداً على الأقل'); return; }
+
+  const results = [];
+  targets.forEach(tokId=>{
+    const tok = state.tokens.find(t=>t.id===tokId);
+    if(!tok) return;
+    const r = calcDamageForTarget(rawDmg, rawTrueDmg, atkType, tok, extraRes);
+    results.push({ tok, ...r });
+  });
+
+  openDamageResultPopup(results, atkType, rawDmg, rawTrueDmg, extraRes);
+}
+
+/* ── DAMAGE RESULT POPUP ── */
+function openDamageResultPopup(results, atkType, rawDmg, rawTrueDmg, extraRes){
+  const el = document.createElement('div');
+  el.className = 'dmg-popup';
+  el.style.zIndex = nextDmgZ();
+  const sw=window.innerWidth, sh=window.innerHeight;
+  el.style.left = Math.max(8, Math.min(sw-320, 20 + Object.keys(openPopups).length*18)) + 'px';
+  el.style.top  = Math.max(60, 80 + Object.keys(openPopups).length*18) + 'px';
+
+  const atkTypeLabel = {physical:'جسدية ⚔',magical:'سحرية ✨',true:'حقيقية 💀'}[atkType]||'—';
+  const hasExtraRes = extraRes && extraRes.pct > 0;
+
+  let resHTML = results.map(r=>{
+    const hpBefore = r.tok.hp;
+    const hpAfter  = trunc1(Math.max(0, hpBefore - r.finalDmg));
+    const hpPct    = r.tok.hpMax>0 ? (hpAfter/r.tok.hpMax*100) : 0;
+    const rc = r.tok.raceColor||'#7c3aed';
+    const stepsHtml = r.steps.map(s=>`
+      <div class="dmg-result-row">
+        <span>${s.label}</span>
+        <span style="color:${s.val<0?'#ef4444':'#22c55e'};font-weight:700;">${s.val>0?'+':''}${fmt1(s.val)}</span>
+      </div>`).join('');
+
+    return `
+      <div class="dmg-result-item">
+        <div class="dmg-result-name" style="color:${rc}">${r.tok.name}</div>
+        <div class="dmg-result-row"><span>الضرر الأولي</span><span style="color:#f87171;font-weight:700;">−${fmt1(rawDmg)}</span></div>
+        ${stepsHtml}
+        <div class="dmg-result-final" style="color:${r.finalDmg>0?'#ef4444':'#22c55e'}">
+          ${r.finalDmg > 0 ? `💥 ضرر فعلي: −${fmt1(r.finalDmg)}` : '🛡 الضرر محجوب بالكامل'}
+          ${r.usedTruePath ? ' <span style="font-size:9px;color:#f59e0b">(ضرر حقيقي)</span>' : ''}
+        </div>
+        <div style="margin-top:4px;font-size:10px;color:var(--muted)">
+          HP: ${fmt1(hpBefore)} → <span style="color:${hpAfter<=0?'#ef4444':'#22c55e'};font-weight:700">${fmt1(hpAfter)}</span>
+        </div>
+        <div class="dmg-result-bar"><div class="dmg-result-bar-fill" style="width:${hpPct}%;"></div></div>
+        <button onclick="applyDamageToToken('${r.tok.id}',${r.finalDmg})"
+          style="margin-top:6px;width:100%;padding:5px;background:#ef444422;border:1px solid #ef444455;border-radius:6px;color:#ef4444;font-size:11px;font-weight:700;cursor:pointer;font-family:'Cairo',sans-serif;">
+          ✓ تطبيق الضرر على ${r.tok.name}
+        </button>
+      </div>
+    `;
+  }).join('');
+
+  const dragId = 'dmg-res-drag-'+Date.now();
+  el.innerHTML = `
+    <div class="dmg-drag-bar" id="${dragId}"><div class="dmg-drag-handle"></div></div>
+    <button class="bp-close" onclick="this.parentElement.remove()">×</button>
+    <div class="bp-body">
+    <div style="font-size:13px;font-weight:900;color:#ef4444;margin-bottom:10px;">💥 نتائج الضرر</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">
+      نوع: <strong style="color:var(--text)">${atkTypeLabel}</strong> |
+      ضرر: <strong style="color:#f87171">${fmt1(rawDmg)}</strong>
+      ${rawTrueDmg>0?`| حقيقي: <strong style="color:#fbbf24">${fmt1(rawTrueDmg)}</strong>`:''}
+      ${hasExtraRes?`<br>🔥 ${extraRes.label||'مقاومة إضافية'}: <strong style="color:#fb923c">${extraRes.pct}٪</strong> <span style="opacity:.7">(تراكم مضاعف)</span>`:''}
+    </div>
+    <div>${resHTML}</div>
+    <button onclick="applyAllDamage(${JSON.stringify(results.map(r=>({id:r.tok.id,dmg:r.finalDmg})))})"
+      style="width:100%;margin-top:8px;padding:9px;background:#ef4444;border:none;border-radius:9px;color:#fff;font-size:12px;font-weight:900;cursor:pointer;font-family:'Cairo',sans-serif;">
+      ✓ تطبيق الضرر على الجميع
+    </button>
+    </div>
+  `;
+  document.getElementById('dmg-popups-layer').appendChild(el);
+  setTimeout(()=> makeDraggableEl(el, document.getElementById(dragId)), 50);
+  keepPopupInView(el);
+}
+
+function applyDamageToToken(tokId, dmg){
+  const tok = state.tokens.find(t=>t.id===tokId);
+  if(!tok) return;
+  dmg = trunc1(dmg);
+  tok.hp = trunc1(Math.max(0, (tok.hp||0) - dmg));
+  const el = document.getElementById('tok_'+tokId);
+  if(el){ el.remove(); renderToken(tok); }
+  Object.keys(openPopups).forEach(pid=>{
+    if(openPopups[pid]) refreshPopupBars(pid);
+  });
+  saveBfState();
+  showToast(`💥 ${tok.name}: −${fmt1(dmg)} HP → ${fmt1(tok.hp)}`);
+}
+
+function applyAllDamage(list){
+  list.forEach(({id, dmg})=> applyDamageToToken(id, dmg));
+}
+
+/* Generic draggable helper */
+/* ── تحجيم النوافذ بالسحب من الشريط السفلي ── */
+function makeResizableEl(el, handle, badge){
+  if(!handle) return;
+  let resizing = false;
+  let startX   = 0;
+  let startW   = 0;
+
+  handle.addEventListener('mousedown', e=>{
+    resizing = true;
+    startX   = e.clientX;
+    startW   = el.offsetWidth;
+    e.stopPropagation();
+    e.preventDefault();
+    document.body.style.cursor = 'ew-resize';
+  });
+  handle.addEventListener('touchstart', e=>{
+    resizing = true;
+    startX   = e.touches[0].clientX;
+    startW   = el.offsetWidth;
+    e.stopPropagation();
+  }, {passive:true});
+
+  window.addEventListener('mousemove', e=>{
+    if(!resizing) return;
+    const dx  = e.clientX - startX;
+    const newW = Math.max(180, Math.min(420, startW + dx));
+    el.style.width = newW + 'px';
+    if(badge) badge.textContent = newW + 'px';
+  });
+  window.addEventListener('touchmove', e=>{
+    if(!resizing) return;
+    const dx  = e.touches[0].clientX - startX;
+    const newW = Math.max(180, Math.min(420, startW + dx));
+    el.style.width = newW + 'px';
+    if(badge) badge.textContent = newW + 'px';
+  }, {passive:true});
+
+  const stop = ()=>{ resizing=false; document.body.style.cursor=''; };
+  window.addEventListener('mouseup',  stop);
+  window.addEventListener('touchend', stop);
+}
+
+/* يُبقي النافذة كلها داخل الشاشة (عند الفتح، وعند تغيّر حجمها أو حجم الشاشة) */
+function clampPopupIntoView(el){
+  if(!el.isConnected) return;
+  const m = 8, vw = window.innerWidth, vh = window.innerHeight;
+  const w = el.offsetWidth, h = el.offsetHeight;
+  const left = Math.max(m, Math.min(parseFloat(el.style.left)||0, vw - w - m));
+  const top  = Math.max(m, Math.min(parseFloat(el.style.top)||0,  vh - h - m));
+  el.style.left = left + 'px';
+  el.style.top  = top  + 'px';
+}
+function keepPopupInView(el){
+  clampPopupIntoView(el);
+  if(window.ResizeObserver){ new ResizeObserver(()=>clampPopupIntoView(el)).observe(el); }
+}
+window.addEventListener('resize', ()=>{
+  document.querySelectorAll('.battle-popup, .dmg-popup').forEach(clampPopupIntoView);
+});
+
+function makeDraggableEl(el, handle){
+  if(!handle) return;
+  let sx,sy,sl,st,drag=false;
+  const dn=e=>{
+    drag=true; el.style.zIndex=nextDmgZ();
+    const ev=e.touches?e.touches[0]:e;
+    sx=ev.clientX;sy=ev.clientY;
+    sl=parseInt(el.style.left)||0;st=parseInt(el.style.top)||0;
+    e.preventDefault();
+  };
+  const dm=e=>{
+    if(!drag)return;
+    const ev=e.touches?e.touches[0]:e;
+    const maxL=Math.max(0,window.innerWidth-el.offsetWidth), maxT=Math.max(0,window.innerHeight-el.offsetHeight);
+    el.style.left=Math.max(0,Math.min(maxL,sl+(ev.clientX-sx)))+'px';
+    el.style.top =Math.max(0,Math.min(maxT,st+(ev.clientY-sy)))+'px';
+    e.preventDefault();
+  };
+  const du=()=>{drag=false;};
+  handle.addEventListener('mousedown',dn);
+  handle.addEventListener('touchstart',dn,{passive:false});
+  window.addEventListener('mousemove',dm);
+  window.addEventListener('touchmove',dm,{passive:false});
+  window.addEventListener('mouseup',du);
+  window.addEventListener('touchend',du);
+}
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ closeAllPopups(); closeModal(); }
+  if(!selectedTokenId) return;
+  const step = 1;
+  if(e.key==='ArrowUp')    { e.preventDefault(); moveToken(selectedTokenId, 0, -step); }
+  if(e.key==='ArrowDown')  { e.preventDefault(); moveToken(selectedTokenId, 0,  step); }
+  if(e.key==='ArrowLeft')  { e.preventDefault(); moveToken(selectedTokenId,  step, 0); }
+  if(e.key==='ArrowRight') { e.preventDefault(); moveToken(selectedTokenId, -step, 0); }
+  if(e.key==='Delete'||e.key==='Backspace'){ removeToken(selectedTokenId); }
+});
+
+/* ── خريطة بيضاء سريعة ── */
+function quickWhiteMap(){
+  const cols = state.gridCols || 20;
+  const rows = state.gridRows || 20;
+  const cp   = state.cellPx || 60;
+  const W = cols * cp, H = rows * cp;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f8f8f6';
+  ctx.fillRect(0,0,W,H);
+  state.mapSrc  = canvas.toDataURL('image/png');
+  state.mapNatW = W; state.mapNatH = H;
+  state.mapW    = W; state.mapH    = H;
+  renderAll();
+  saveBfState();
+  showToast('⬜ تم إنشاء خريطة بيضاء');
+}
+
+/* ═══════════════════════════════════════
+   START
+═══════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', init);
+
+</script>
+
+</body>
+</html>
